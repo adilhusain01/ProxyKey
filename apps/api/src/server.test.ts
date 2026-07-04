@@ -1,0 +1,72 @@
+import { describe, expect, it } from "vitest";
+import { buildServer } from "./server";
+import { RWA_SERVICE_ACCOUNT, createResourceHash } from "./rwa";
+
+const hash =
+  "0x1111111111111111111111111111111111111111111111111111111111111111";
+
+describe("api server", () => {
+  it("serves health", async () => {
+    const app = buildServer();
+    const response = await app.inject({ method: "GET", url: "/health" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ status: "ok", service: "proxykey-api" });
+    await app.close();
+  });
+
+  it("returns x402 payment requirements for RWA reports", async () => {
+    const app = buildServer();
+    const response = await app.inject({
+      method: "POST",
+      url: "/x402/rwa/report",
+      payload: { asset: "tokenized-treasury-note" },
+    });
+
+    expect(response.statusCode).toBe(402);
+    expect(response.json().accepts[0]).toMatchObject({
+      scheme: "casper-testnet-mandate",
+      network: "casper-test",
+    });
+    await app.close();
+  });
+
+  it("verifies an x402 proof and returns a report", async () => {
+    const app = buildServer();
+    const response = await app.inject({
+      method: "POST",
+      url: "/x402/rwa/verify-payment",
+      payload: {
+        asset: "tokenized-treasury-note",
+        proof: {
+          deployHash: hash,
+          from: "account-hash-user0001",
+          to: RWA_SERVICE_ACCOUNT,
+          amount: "2500000000",
+          resourceHash: createResourceHash("tokenized-treasury-note"),
+          signature: "0x11111111111111111111111111111111",
+        },
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().report).toMatchObject({
+      asset: "tokenized-treasury-note",
+      rating: "moderate-risk",
+    });
+    await app.close();
+  });
+
+  it("returns validation errors for malformed agent registration", async () => {
+    const app = buildServer();
+    const response = await app.inject({
+      method: "POST",
+      url: "/agents",
+      payload: { name: "RWA Sentinel" },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ status: "error" });
+    await app.close();
+  });
+});

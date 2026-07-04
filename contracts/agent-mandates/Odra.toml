@@ -1,0 +1,11 @@
+[[contracts]]
+fqn = "proxykey_agent_mandates::AgentRegistry"
+
+[[contracts]]
+fqn = "proxykey_agent_mandates::IntentInbox"
+
+[[contracts]]
+fqn = "proxykey_agent_mandates::MandateVault"
+
+[[contracts]]
+fqn = "proxykey_agent_mandates::ReceiptLedger"

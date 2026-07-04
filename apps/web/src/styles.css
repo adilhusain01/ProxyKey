@@ -1,0 +1,135 @@
+@import "@fontsource-variable/geist";
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --radius: 0.5rem;
+  --background: oklch(0.985 0.004 240);
+  --foreground: oklch(0.18 0.018 245);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.43 0.116 185);
+  --primary-foreground: oklch(0.99 0.004 185);
+  --secondary: oklch(0.93 0.012 245);
+  --secondary-foreground: oklch(0.25 0.018 245);
+  --muted: oklch(0.94 0.01 245);
+  --muted-foreground: oklch(0.48 0.018 245);
+  --accent: oklch(0.82 0.125 82);
+  --accent-foreground: oklch(0.2 0.03 82);
+  --destructive: oklch(0.58 0.2 28);
+  --border: oklch(0.88 0.012 245);
+  --input: var(--border);
+  --ring: oklch(0.58 0.116 185);
+  --success: oklch(0.55 0.13 158);
+}
+
+:root[data-theme="dark"] {
+  --background: oklch(0.15 0.015 245);
+  --foreground: oklch(0.94 0.006 245);
+  --card: oklch(0.19 0.016 245);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.19 0.016 245);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.67 0.13 185);
+  --primary-foreground: oklch(0.13 0.014 245);
+  --secondary: oklch(0.24 0.018 245);
+  --secondary-foreground: oklch(0.92 0.006 245);
+  --muted: oklch(0.24 0.018 245);
+  --muted-foreground: oklch(0.72 0.012 245);
+  --accent: oklch(0.78 0.13 82);
+  --accent-foreground: oklch(0.16 0.02 82);
+  --destructive: oklch(0.68 0.19 28);
+  --border: oklch(0.3 0.018 245);
+  --input: var(--border);
+  --ring: oklch(0.68 0.13 185);
+  --success: oklch(0.68 0.13 158);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: oklch(0.15 0.015 245);
+    --foreground: oklch(0.94 0.006 245);
+    --card: oklch(0.19 0.016 245);
+    --card-foreground: var(--foreground);
+    --popover: oklch(0.19 0.016 245);
+    --popover-foreground: var(--foreground);
+    --primary: oklch(0.67 0.13 185);
+    --primary-foreground: oklch(0.13 0.014 245);
+    --secondary: oklch(0.24 0.018 245);
+    --secondary-foreground: oklch(0.92 0.006 245);
+    --muted: oklch(0.24 0.018 245);
+    --muted-foreground: oklch(0.72 0.012 245);
+    --accent: oklch(0.78 0.13 82);
+    --accent-foreground: oklch(0.16 0.02 82);
+    --destructive: oklch(0.68 0.19 28);
+    --border: oklch(0.3 0.018 245);
+    --input: var(--border);
+    --ring: oklch(0.68 0.13 185);
+    --success: oklch(0.68 0.13 158);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--background);
+}
+
+body {
+  min-height: 100svh;
+  margin: 0;
+  color: var(--foreground);
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--background) 94%, var(--primary) 6%), var(--background) 28rem),
+    var(--background);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.surface-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--card) 92%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in oklch, white 70%, transparent) inset,
+    0 18px 40px color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+
+.page-grid {
+  width: min(80rem, calc(100% - 2rem));
+  min-height: calc(100svh - 8rem);
+  margin-inline: auto;
+  padding-block: 1.25rem 2rem;
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .page-grid {
+    padding-block: 1.5rem 2.5rem;
+    gap: 1.25rem;
+  }
+}
