@@ -116,6 +116,9 @@ importers:
       '@make-software/csprclick-ui':
         specifier: 1.12.1
         version: 1.12.1(@types/react@18.3.31)(react-country-flag@3.1.0(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react-modal@3.16.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(styled-components@5.3.11(@babel/core@7.29.7)(react-dom@18.3.1(react@18.3.1))(react-is@18.3.1)(react@18.3.1))(typescript@6.0.3)
+      '@proxykey/casper':
+        specifier: workspace:*
+        version: link:../../packages/casper
       '@proxykey/shared':
         specifier: workspace:*
         version: link:../../packages/shared

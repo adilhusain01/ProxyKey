@@ -19,6 +19,7 @@
     "@make-software/csprclick-core-client": "1.11.0",
     "@make-software/csprclick-core-types": "1.13.1",
     "@make-software/csprclick-ui": "1.12.1",
+    "@proxykey/casper": "workspace:*",
     "@proxykey/shared": "workspace:*",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-devtools": "latest",

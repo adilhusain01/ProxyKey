@@ -2,8 +2,10 @@ import { createFileRoute } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import { ShieldCheck, XCircle } from "lucide-react"
 import { toast } from "sonner"
+import { prepareRevokeMandateDeploy } from "@proxykey/casper"
 import { Badge } from "#/components/ui/badge"
 import { Button } from "#/components/ui/button"
+import { requireProxyKeyContractHash, sendPreparedDeploy } from "#/lib/csprclick"
 import { revokeIndexedMandate, useIndexedAgents, useIndexedMandates } from "#/lib/proxykey-api"
 import { formatMotes } from "#/lib/proxykey-data"
 import { useProxyKeyStore } from "#/stores/proxykey-store"
@@ -75,11 +77,20 @@ function MandatesPage() {
                 className="mt-4 w-full"
                 onClick={() => {
                   void (async () => {
-                    await revokeIndexedMandate(account, mandate.id)
+                    const deployHash = await sendPreparedDeploy(
+                      prepareRevokeMandateDeploy(requireProxyKeyContractHash(), {
+                        mandateId: mandate.id,
+                        user: account,
+                      }),
+                    )
+                    await revokeIndexedMandate(account, mandate.id, deployHash)
                     await queryClient.invalidateQueries({
                       queryKey: ["proxykey", account, "mandates"],
                     })
-                    toast.warning("Revocation prepared for CSPR.click signing")
+                    await queryClient.invalidateQueries({
+                      queryKey: ["proxykey", account, "vault"],
+                    })
+                    toast.warning("Mandate revoked")
                   })()
                 }}
               >

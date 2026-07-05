@@ -13,7 +13,9 @@ This repository is a connected hackathon prototype. The local product loop is wi
 5. Agent execution consumes reserved vault funds, updates mandate spend, marks the intent executed, and records a receipt.
 6. The web app reads only connected-wallet API data; it does not ship hardcoded fixture records.
 
-Remaining production gap: real Casper Testnet deployment and CSPR.click signed deploy submission are not complete yet. `contracts/agent-mandates` is a tested Rust contract-domain implementation, and `packages/casper` prepares Casper entrypoint payloads, but the authority still needs to move from the local API/index flow to deployed Casper contracts and an event indexer.
+User-side CSPR.click submission is wired for vault deposit, vault withdraw, intent approval, and mandate revocation. Those flows build Casper contract-call transactions through `packages/casper`, send them through the connected wallet, verify the returned deploy or transaction hash against Casper Testnet RPC, and only then index the state change in the API.
+
+The API now records verified deploy events in PostgreSQL for vault, approval, mandate, execution, and receipt operations. Remaining production gap: `contracts/agent-mandates` is still a tested Rust contract-domain implementation, not a compiled deployed Odra contract package. The final authority still needs the contract crate converted to deployable Odra/Casper Wasm and deployed to Testnet.
 
 ## Apps and Packages
 
@@ -22,7 +24,7 @@ Remaining production gap: real Casper Testnet deployment and CSPR.click signed d
 - `apps/agent`: MCP server exposing ProxyKey tools for AI agents.
 - `contracts/agent-mandates`: Rust contract-domain implementation for AgentRegistry, IntentInbox, MandateVault, and ReceiptLedger behavior.
 - `packages/shared`: shared Zod schemas and TypeScript types.
-- `packages/casper`: Casper Testnet client/deploy helpers.
+- `packages/casper`: Casper Testnet transaction helpers for CSPR.click and agent deploy payloads.
 - `packages/ui`: shared UI package boundary for future extracted components.
 
 ## Product Flow
@@ -30,13 +32,14 @@ Remaining production gap: real Casper Testnet deployment and CSPR.click signed d
 The connected local flow is API-first and mirrors the intended on-chain contract flow:
 
 - `POST /agents` registers an agent identity.
-- `POST /users/:account/vault/deposit` indexes user vault funding.
+- `POST /users/:account/vault/deposit` indexes user vault funding after a CSPR.click deploy hash is supplied.
 - `POST /users/:account/intents` stages an agent intent for approval.
-- `PATCH /users/:account/intents/:id` approves or rejects. Approval creates a mandate and reserves vault balance.
+- `PATCH /users/:account/intents/:id` approves or rejects. Approval requires a CSPR.click deploy hash, creates a mandate, and reserves vault balance.
 - `POST /users/:account/mandates/:id/execute` executes within mandate scope, updates vault and mandate state, and writes a receipt.
 - `GET /users/:account/intents`, `/mandates`, `/receipts`, and `/vault` power the PWA.
+- `GET /users/:account/deploys` and `GET /deploys/:hash` expose verified Casper deploy index events.
 
-MCP tools in `apps/agent` call these same API paths and return prepared Casper deploy payloads from `packages/casper`.
+MCP tools in `apps/agent` call the agent-safe API paths and return prepared Casper deploy payloads from `packages/casper`. User mandate creation stays with the connected wallet flow.
 
 ## Commands
 
@@ -67,11 +70,17 @@ The web app runs on `http://localhost:3000` by default. If that port is in use, 
 ## Environment
 
 - `DATABASE_URL`: PostgreSQL connection used by the Fastify indexer API.
+- `CASPER_NODE_RPC_URL`: Casper Testnet RPC endpoint used to verify deploy and transaction hashes before indexing.
+- `CASPER_DEPLOY_VERIFY_ATTEMPTS`: bounded polling attempts for newly submitted hashes.
+- `CASPER_DEPLOY_VERIFY_DELAY_MS`: delay between Casper RPC polling attempts.
 - `PROXYKEY_API_BASE_URL`: API URL used by the MCP agent tools for indexing agent actions.
 - `PROXYKEY_CONTRACT_HASH`: deployed Casper Testnet contract package hash.
 - `VITE_CSPRCLICK_APP_ID`: CSPR.click app id. `csprclick-template` is valid for localhost development.
 - `VITE_PROXYKEY_API_BASE_URL`: Fastify indexer API used by the web app.
+- `VITE_PROXYKEY_CONTRACT_HASH`: deployed Casper Testnet contract hash used by the PWA when building CSPR.click contract-call transactions.
 - `VITE_WALLETCONNECT_PROJECT_ID`: enables WalletConnect in CSPR.click when provided.
+
+Local private keys such as `casper_temp_private_key.pem` are ignored by git. Keep temporary Casper keys in ignored files or `.env`; never stage them.
 
 ## Database
 
@@ -97,14 +106,13 @@ pnpm build
 pnpm contracts:test
 ```
 
-The current command-verified path covers shared schema validation, Fastify route validation, MCP tool validation, production builds, and Rust contract-domain tests for nonce replay rejection, mandate caps, target/resource enforcement, revocation, and execution.
+The current command-verified path covers shared schema validation, CSPR.click-ready transaction payload construction, Fastify route validation including deploy-hash gates, Casper deploy-event indexing code, MCP tool validation, production builds, and Rust contract-domain tests for nonce replay rejection, mandate caps, target/resource enforcement, revocation, and execution.
 
 ## Next On-Chain Work
 
 To make ProxyKey fully Casper-authoritative:
 
 1. Convert the Rust contract-domain implementation into deployable Odra contracts.
-2. Deploy the contract package to Casper Testnet and set `PROXYKEY_CONTRACT_HASH`.
-3. Submit user actions through CSPR.click signed deploys instead of direct API writes.
-4. Add an indexer that watches Casper deploy results and updates PostgreSQL from contract events.
-5. Gate API mutation routes so only verified agent/user signatures can index pending off-chain state.
+2. Deploy the contract package to Casper Testnet and set `PROXYKEY_CONTRACT_HASH` plus `VITE_PROXYKEY_CONTRACT_HASH`.
+3. Replace hash-level RPC verification with contract-event decoding once the deployed package emits structured events.
+4. Gate API mutation routes so only verified agent/user signatures can index pending off-chain state.

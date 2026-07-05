@@ -1,4 +1,5 @@
 import { z } from "zod";
+import CasperSdk from "casper-js-sdk";
 import type { AgentProfile, Intent, Mandate, PaymentProof, Receipt } from "@proxykey/shared";
 
 export const casperNetworkConfigSchema = z.object({
@@ -39,6 +40,37 @@ export interface PreparedDeploy<TArgs extends Record<string, unknown>> {
   signingPayload: string;
 }
 
+export interface CsprClickTransactionPayload {
+  transaction: unknown;
+  transactionHash: string;
+}
+
+const casperSdk = CasperSdk as unknown as {
+  Args: {
+    fromMap(args: Record<string, unknown>): unknown;
+  };
+  CLValue: {
+    newCLString(value: string): unknown;
+    newCLUInt512(value: string): unknown;
+    newCLUint64(value: string): unknown;
+  };
+  ContractCallBuilder: new () => {
+    from(publicKey: unknown): unknown;
+    byHash(contractHash: string): unknown;
+    entryPoint(entrypoint: string): unknown;
+    runtimeArgs(args: unknown): unknown;
+    chainName(chainName: string): unknown;
+    payment(paymentMotes: number): unknown;
+    build(): {
+      hash: { toJSON(): string };
+      toJSON(): unknown;
+    };
+  };
+  PublicKey: {
+    fromHex(publicKeyHex: string): unknown;
+  };
+};
+
 export function createSigningPayload<TArgs extends Record<string, unknown>>(
   request: DeployRequest<TArgs>,
 ): string {
@@ -57,6 +89,58 @@ export function prepareDeploy<TArgs extends Record<string, unknown>>(
     network: casperNetworkConfigSchema.parse(network),
     request,
     signingPayload: createSigningPayload(request),
+  };
+}
+
+function normalizeContractHash(contractHash: string): string {
+  return contractHash.replace(/^hash-/, "").replace(/^0x/, "");
+}
+
+function encodeRuntimeArg(name: string, value: unknown): unknown {
+  if (typeof value === "bigint") {
+    return name.endsWith("_block")
+      ? casperSdk.CLValue.newCLUint64(value.toString())
+      : casperSdk.CLValue.newCLUInt512(value.toString());
+  }
+
+  if (typeof value === "number") {
+    return casperSdk.CLValue.newCLUint64(String(value));
+  }
+
+  if (typeof value === "string") {
+    return casperSdk.CLValue.newCLString(value);
+  }
+
+  throw new TypeError(`Unsupported Casper runtime arg ${name}`);
+}
+
+function runtimeArgsFromRecord(args: Record<string, unknown>): unknown {
+  return casperSdk.Args.fromMap(
+    Object.fromEntries(
+      Object.entries(args).map(([name, value]) => [
+        name,
+        encodeRuntimeArg(name, value),
+      ]),
+    ),
+  );
+}
+
+export function buildContractCallTransaction<TArgs extends Record<string, unknown>>(
+  prepared: PreparedDeploy<TArgs>,
+  signingPublicKeyHex: string,
+): CsprClickTransactionPayload {
+  const transaction = new casperSdk.ContractCallBuilder();
+  transaction.from(casperSdk.PublicKey.fromHex(signingPublicKeyHex));
+  transaction.byHash(normalizeContractHash(prepared.request.contractHash));
+  transaction.entryPoint(prepared.request.entrypoint);
+  transaction.runtimeArgs(runtimeArgsFromRecord(prepared.request.args));
+  transaction.chainName(prepared.network.chainName);
+  transaction.payment(Number(prepared.request.paymentMotes));
+
+  const built = transaction.build();
+  return {
+    transaction: built.toJSON(),
+    transactionHash: built.hash.toJSON(),
   };
 }
 

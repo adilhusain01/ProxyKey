@@ -69,4 +69,30 @@ describe("api server", () => {
     expect(response.json()).toMatchObject({ status: "error" });
     await app.close();
   });
+
+  it("rejects vault indexing without a Casper deploy hash", async () => {
+    const app = buildServer();
+    const response = await app.inject({
+      method: "POST",
+      url: "/users/account-hash-user0001/vault/deposit",
+      payload: { amount: "2500000000" },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ status: "error" });
+    await app.close();
+  });
+
+  it("rejects mandate revocation indexing without a Casper deploy hash", async () => {
+    const app = buildServer();
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/users/account-hash-user0001/mandates/mandate-rwa-001/revoke",
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ status: "error" });
+    await app.close();
+  });
 });

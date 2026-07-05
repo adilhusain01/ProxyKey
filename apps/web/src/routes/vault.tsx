@@ -2,8 +2,13 @@ import { createFileRoute } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import type { FormEvent } from "react"
 import { ArrowDownToLine, ArrowUpFromLine, WalletCards } from "lucide-react"
+import {
+  prepareVaultDepositDeploy,
+  prepareVaultWithdrawDeploy,
+} from "@proxykey/casper"
 import { Button } from "#/components/ui/button"
 import { Input } from "#/components/ui/input"
+import { requireProxyKeyContractHash, sendPreparedDeploy } from "#/lib/csprclick"
 import { depositIndexedVault, useIndexedVault, withdrawIndexedVault } from "#/lib/proxykey-api"
 import { emptyVaultBalance, formatMotes } from "#/lib/proxykey-data"
 import { useProxyKeyStore } from "#/stores/proxykey-store"
@@ -30,9 +35,21 @@ function VaultPage() {
 
     const motes = BigInt(Math.round(cspr * 1_000_000_000))
     if (direction === "deposit") {
-      await depositIndexedVault(store.account, motes)
+      const deployHash = await sendPreparedDeploy(
+        prepareVaultDepositDeploy(requireProxyKeyContractHash(), {
+          user: store.account,
+          amount: motes,
+        }),
+      )
+      await depositIndexedVault(store.account, motes, deployHash)
     } else {
-      await withdrawIndexedVault(store.account, motes)
+      const deployHash = await sendPreparedDeploy(
+        prepareVaultWithdrawDeploy(requireProxyKeyContractHash(), {
+          user: store.account,
+          amount: motes,
+        }),
+      )
+      await withdrawIndexedVault(store.account, motes, deployHash)
     }
     await queryClient.invalidateQueries({
       queryKey: ["proxykey", store.account, "vault"],

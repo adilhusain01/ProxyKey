@@ -94,7 +94,7 @@ export const vaultBalanceSchema = z.object({
 
 export const vaultOperationSchema = z.object({
   amount: positiveAmountSchema,
-  deployHash: hashSchema.optional(),
+  deployHash: hashSchema,
 });
 
 export const paymentProofSchema = z.object({
@@ -141,6 +141,10 @@ export const mandateInputSchema = mandateSchema.omit({
   status: true,
 });
 
+export const createMandateInputSchema = mandateInputSchema.extend({
+  deployHash: hashSchema,
+});
+
 export const receiptInputSchema = receiptSchema.omit({
   id: true,
   createdAt: true,
@@ -156,6 +160,11 @@ export const approveIntentInputSchema = z.object({
   cap: positiveAmountSchema.optional(),
   resourcePatternHash: hashSchema.optional(),
   expiryBlock: z.coerce.bigint().positive().optional(),
+  deployHash: hashSchema.optional(),
+});
+
+export const revokeMandateInputSchema = z.object({
+  deployHash: hashSchema,
 });
 
 export const executePaymentInputSchema = z.object({
@@ -182,10 +191,12 @@ export type WalletChallenge = z.infer<typeof walletChallengeSchema>;
 export type WalletVerification = z.infer<typeof walletVerificationSchema>;
 export type StagedIntentInput = z.infer<typeof stagedIntentInputSchema>;
 export type MandateInput = z.infer<typeof mandateInputSchema>;
+export type CreateMandateInput = z.infer<typeof createMandateInputSchema>;
 export type ReceiptInput = z.infer<typeof receiptInputSchema>;
 export type IndexedReceiptInput = z.infer<typeof indexedReceiptInputSchema>;
 export type ApproveIntentInput = z.infer<typeof approveIntentInputSchema>;
 export type ExecutePaymentInput = z.infer<typeof executePaymentInputSchema>;
+export type RevokeMandateInput = z.infer<typeof revokeMandateInputSchema>;
 
 export function bigintToJson(value: bigint): string {
   return value.toString();

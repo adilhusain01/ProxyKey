@@ -94,12 +94,10 @@ export async function stageIntent(input: StagedIntentInput) {
 
 export async function requestMandate(input: MandateInput) {
   const mandate = mandateInputSchema.parse(input);
-  const indexed = await postApi(`/users/${mandate.user}/mandates`, mandate);
   return {
     mandateRequestId: id("mandate-request", mandate),
     status: "pending-user-approval",
     mandate,
-    indexed,
     deploy: prepareMandateDeploy(CONTRACT_HASH, {
       id: id("mandate-preview", mandate),
       ...mandate,

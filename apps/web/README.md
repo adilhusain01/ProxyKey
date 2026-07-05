@@ -26,7 +26,9 @@ pnpm --filter @proxykey/web test
 - Wallet identity comes from CSPR.click and is stored in the local Zustand account store.
 - TanStack Query reads account-scoped data from `VITE_PROXYKEY_API_BASE_URL`.
 - Empty states are shown when the connected account has no indexed intents, mandates, receipts, or vault balance.
-- Approval and vault actions call the API routes that mirror the intended Casper contract flow.
+- Vault deposit, vault withdraw, intent approval, and mandate revocation first build a Casper contract-call transaction through `@proxykey/casper`.
+- CSPR.click sends the transaction from the connected wallet.
+- The API index is updated only after the wallet returns a deploy or transaction hash.
 
 ## CSPR.click
 
@@ -34,6 +36,8 @@ Local development uses the official `csprclick-template` app id. Set `VITE_CSPRC
 
 Set `VITE_WALLETCONNECT_PROJECT_ID` to enable WalletConnect in the provider list.
 
+Set `VITE_PROXYKEY_CONTRACT_HASH` to the deployed ProxyKey Casper Testnet contract hash before signing user actions.
+
 ## Current Limitation
 
-The PWA currently prepares and indexes the mandate flow through the API. Final production behavior still needs CSPR.click signed Casper Testnet deploy submission and an indexer that reads confirmed contract events back into PostgreSQL.
+The PWA now sends user-sensitive actions through CSPR.click. Final production behavior still needs a deployed Casper Testnet contract package and an indexer that reads confirmed contract events back into PostgreSQL.

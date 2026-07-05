@@ -10,9 +10,11 @@ import {
   XCircle,
 } from "lucide-react"
 import { toast } from "sonner"
+import { prepareApproveIntentDeploy } from "@proxykey/casper"
 import { Badge } from "#/components/ui/badge"
 import { Button } from "#/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs"
+import { requireProxyKeyContractHash, sendPreparedDeploy } from "#/lib/csprclick"
 import {
   useIndexedAgents,
   useIndexedIntents,
@@ -38,9 +40,17 @@ function ApprovalInbox() {
 
   async function approve(intentId: string) {
     if (!account) return
-    await updateIntentStatus(account, intentId, "approved")
+    const deployHash = await sendPreparedDeploy(
+      prepareApproveIntentDeploy(requireProxyKeyContractHash(), {
+        intentId,
+        user: account,
+      }),
+    )
+    await updateIntentStatus(account, intentId, "approved", deployHash)
     await queryClient.invalidateQueries({ queryKey: ["proxykey", account, "intents"] })
-    toast.success("Mandate approval prepared for CSPR.click signing")
+    await queryClient.invalidateQueries({ queryKey: ["proxykey", account, "mandates"] })
+    await queryClient.invalidateQueries({ queryKey: ["proxykey", account, "vault"] })
+    toast.success("Mandate approval recorded")
   }
 
   async function reject(intentId: string) {

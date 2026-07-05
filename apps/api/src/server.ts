@@ -9,17 +9,29 @@ import { ZodError } from "zod";
 import {
   agentProfileSchema,
   approveIntentInputSchema,
+  createMandateInputSchema,
   executePaymentInputSchema,
   indexedReceiptInputSchema,
-  mandateInputSchema,
   paymentProofSchema,
+  revokeMandateInputSchema,
   stagedIntentInputSchema,
   vaultOperationSchema,
   walletVerificationSchema,
   type WalletChallenge,
 } from "@proxykey/shared";
+import {
+  verifyCasperDeployHash,
+  type IndexedOperation,
+} from "./casper-indexer";
 import { closeDb, createDb } from "./db/client";
-import { agents, intents, mandates, receipts, vaultBalances } from "./db/schema";
+import {
+  agents,
+  deployEvents,
+  intents,
+  mandates,
+  receipts,
+  vaultBalances,
+} from "./db/schema";
 import { buildRwaReport, createResourceHash, verifyPaymentProof } from "./rwa";
 
 config({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
@@ -73,6 +85,31 @@ function defaultExpiryBlock() {
   return BigInt(process.env.DEFAULT_MANDATE_EXPIRY_BLOCK ?? "9000000");
 }
 
+async function buildDeployEvent(input: {
+  deployHash: string;
+  operation: IndexedOperation;
+  account: string;
+  intentId?: string | undefined;
+  mandateId?: string | undefined;
+}) {
+  try {
+    const verification = await verifyCasperDeployHash(input.deployHash);
+    return {
+      deployHash: input.deployHash,
+      operation: input.operation,
+      account: input.account,
+      intentId: input.intentId,
+      mandateId: input.mandateId,
+      status: verification.status,
+      raw: JSON.stringify(verification.raw),
+      observedAt: new Date(),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown Casper RPC error";
+    throw new HttpError(409, message);
+  }
+}
+
 export function buildServer() {
   const app = Fastify({ logger: true });
 
@@ -118,6 +155,22 @@ export function buildServer() {
     service: "proxykey-api",
     network: "casper-test",
   }));
+
+  app.get<{ Params: { hash: string } }>("/deploys/:hash", async (request, reply) => {
+    const db = createDb();
+    const [event] = await db
+      .select()
+      .from(deployEvents)
+      .where(eq(deployEvents.deployHash, request.params.hash));
+
+    if (!event) {
+      return reply
+        .code(404)
+        .send({ status: "error", message: "Deploy event not indexed" });
+    }
+
+    return serializeJson(event);
+  });
 
   app.post<{ Body: { account: string } }>("/auth/challenge", async (request) => {
     const nonce = crypto.randomBytes(18).toString("hex");
@@ -229,6 +282,18 @@ export function buildServer() {
     },
   );
 
+  app.get<{ Params: { account: string } }>(
+    "/users/:account/deploys",
+    async (request) => {
+      const db = createDb();
+      const rows = await db
+        .select()
+        .from(deployEvents)
+        .where(eq(deployEvents.account, request.params.account));
+      return serializeJson(rows);
+    },
+  );
+
   app.post<{ Params: { account: string } }>(
     "/users/:account/intents",
     async (request, reply) => {
@@ -259,6 +324,18 @@ export function buildServer() {
     "/users/:account/intents/:id",
     async (request, reply) => {
       const body = approveIntentInputSchema.parse(request.body);
+      if (body.status === "approved" && !body.deployHash) {
+        throw new HttpError(400, "Approved intents require a Casper deploy hash");
+      }
+      const deployEvent =
+        body.status === "approved"
+          ? await buildDeployEvent({
+              deployHash: body.deployHash!,
+              operation: "intent.approve",
+              account: request.params.account,
+              intentId: request.params.id,
+            })
+          : undefined;
       const db = createDb();
 
       const result = await db.transaction(async (tx) => {
@@ -359,6 +436,21 @@ export function buildServer() {
           })
           .where(eq(vaultBalances.user, intent.user));
 
+        if (deployEvent) {
+          await tx
+            .insert(deployEvents)
+            .values(deployEvent)
+            .onConflictDoUpdate({
+              target: deployEvents.deployHash,
+              set: {
+                operation: deployEvent.operation,
+                status: deployEvent.status,
+                raw: deployEvent.raw,
+                observedAt: deployEvent.observedAt,
+              },
+            });
+        }
+
         const [updatedIntent] = await tx
           .update(intents)
           .set({ status: "approved" })
@@ -387,35 +479,60 @@ export function buildServer() {
   app.post<{ Params: { account: string } }>(
     "/users/:account/mandates",
     async (request, reply) => {
-      const input = mandateInputSchema.parse(request.body);
+      const input = createMandateInputSchema.parse(request.body);
       requireMatchingAccount(request.params.account, input.user);
+      const { deployHash: _deployHash, ...mandateInput } = input;
+      const deployEvent = await buildDeployEvent({
+        deployHash: input.deployHash,
+        operation: "mandate.create",
+        account: input.user,
+      });
       const db = createDb();
 
       const created = await db.transaction(async (tx) => {
         const [balance] = await tx
           .select()
           .from(vaultBalances)
-          .where(eq(vaultBalances.user, input.user));
+          .where(eq(vaultBalances.user, mandateInput.user));
 
-        if (!balance || balance.available < input.cap) {
+        if (!balance || balance.available < mandateInput.cap) {
           throw new HttpError(409, "Insufficient available vault balance for mandate cap");
         }
 
         const mandate = {
-          id: id("mandate", input),
-          ...input,
+          id: id("mandate", mandateInput),
+          ...mandateInput,
           spent: 0n,
           status: "active",
         };
         const [createdMandate] = await tx.insert(mandates).values(mandate).returning();
+        if (!createdMandate) {
+          throw new Error("Mandate creation did not return a row");
+        }
+        await tx
+          .insert(deployEvents)
+          .values({
+            ...deployEvent,
+            mandateId: createdMandate.id,
+          })
+          .onConflictDoUpdate({
+            target: deployEvents.deployHash,
+            set: {
+              operation: deployEvent.operation,
+              mandateId: createdMandate.id,
+              status: deployEvent.status,
+              raw: deployEvent.raw,
+              observedAt: deployEvent.observedAt,
+            },
+          });
         await tx
           .update(vaultBalances)
           .set({
-            reserved: balance.reserved + input.cap,
-            available: balance.available - input.cap,
+            reserved: balance.reserved + mandateInput.cap,
+            available: balance.available - mandateInput.cap,
             updatedAt: new Date(),
           })
-          .where(eq(vaultBalances.user, input.user));
+          .where(eq(vaultBalances.user, mandateInput.user));
 
         return createdMandate;
       });
@@ -427,6 +544,13 @@ export function buildServer() {
   app.patch<{ Params: { account: string; id: string } }>(
     "/users/:account/mandates/:id/revoke",
     async (request, reply) => {
+      const input = revokeMandateInputSchema.parse(request.body ?? {});
+      const deployEvent = await buildDeployEvent({
+        deployHash: input.deployHash,
+        operation: "mandate.revoke",
+        account: request.params.account,
+        mandateId: request.params.id,
+      });
       const db = createDb();
       const updated = await db.transaction(async (tx) => {
         const [mandate] = await tx
@@ -473,6 +597,20 @@ export function buildServer() {
           .where(eq(mandates.id, mandate.id))
           .returning();
 
+        await tx
+          .insert(deployEvents)
+          .values(deployEvent)
+          .onConflictDoUpdate({
+            target: deployEvents.deployHash,
+            set: {
+              operation: deployEvent.operation,
+              mandateId: deployEvent.mandateId,
+              status: deployEvent.status,
+              raw: deployEvent.raw,
+              observedAt: deployEvent.observedAt,
+            },
+          });
+
         return updatedMandate;
       });
 
@@ -484,6 +622,13 @@ export function buildServer() {
     "/users/:account/mandates/:id/execute",
     async (request, reply) => {
       const input = executePaymentInputSchema.parse(request.body);
+      const deployEvent = await buildDeployEvent({
+        deployHash: input.deployHash,
+        operation: "mandate.execute",
+        account: request.params.account,
+        intentId: input.intentId,
+        mandateId: request.params.id,
+      });
       const db = createDb();
 
       const result = await db.transaction(async (tx) => {
@@ -600,6 +745,21 @@ export function buildServer() {
           })
           .returning();
 
+        await tx
+          .insert(deployEvents)
+          .values(deployEvent)
+          .onConflictDoUpdate({
+            target: deployEvents.deployHash,
+            set: {
+              operation: deployEvent.operation,
+              intentId: deployEvent.intentId,
+              mandateId: deployEvent.mandateId,
+              status: deployEvent.status,
+              raw: deployEvent.raw,
+              observedAt: deployEvent.observedAt,
+            },
+          });
+
         return {
           status: "executed",
           mandate: updatedMandate,
@@ -627,6 +787,13 @@ export function buildServer() {
 
   app.post("/receipts", async (request, reply) => {
     const input = indexedReceiptInputSchema.parse(request.body);
+    const deployEvent = await buildDeployEvent({
+      deployHash: input.deployHash,
+      operation: "receipt.record",
+      account: input.user,
+      intentId: input.intentId,
+      mandateId: input.mandateId,
+    });
     const db = createDb();
     const receipt = {
       id: id("receipt", input),
@@ -639,7 +806,24 @@ export function buildServer() {
       resultHash: input.resultHash,
       createdAt: new Date(),
     };
-    const [created] = await db.insert(receipts).values(receipt).returning();
+    const [created] = await db.transaction(async (tx) => {
+      const [createdReceipt] = await tx.insert(receipts).values(receipt).returning();
+      await tx
+        .insert(deployEvents)
+        .values(deployEvent)
+        .onConflictDoUpdate({
+          target: deployEvents.deployHash,
+          set: {
+            operation: deployEvent.operation,
+            intentId: deployEvent.intentId,
+            mandateId: deployEvent.mandateId,
+            status: deployEvent.status,
+            raw: deployEvent.raw,
+            observedAt: deployEvent.observedAt,
+          },
+        });
+      return [createdReceipt];
+    });
     return reply.code(201).send(serializeJson(created));
   });
 
@@ -668,26 +852,46 @@ export function buildServer() {
     "/users/:account/vault/deposit",
     async (request, reply) => {
       const input = vaultOperationSchema.parse(request.body);
+      const deployEvent = await buildDeployEvent({
+        deployHash: input.deployHash,
+        operation: "vault.deposit",
+        account: request.params.account,
+      });
       const now = new Date();
       const db = createDb();
-      const [created] = await db
-        .insert(vaultBalances)
-        .values({
-          user: request.params.account,
-          total: input.amount,
-          reserved: 0n,
-          available: input.amount,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: vaultBalances.user,
-          set: {
-            total: sql`${vaultBalances.total} + ${input.amount}`,
-            available: sql`${vaultBalances.available} + ${input.amount}`,
+      const [created] = await db.transaction(async (tx) => {
+        const [updatedVault] = await tx
+          .insert(vaultBalances)
+          .values({
+            user: request.params.account,
+            total: input.amount,
+            reserved: 0n,
+            available: input.amount,
             updatedAt: now,
-          },
-        })
-        .returning();
+          })
+          .onConflictDoUpdate({
+            target: vaultBalances.user,
+            set: {
+              total: sql`${vaultBalances.total} + ${input.amount}`,
+              available: sql`${vaultBalances.available} + ${input.amount}`,
+              updatedAt: now,
+            },
+          })
+          .returning();
+        await tx
+          .insert(deployEvents)
+          .values(deployEvent)
+          .onConflictDoUpdate({
+            target: deployEvents.deployHash,
+            set: {
+              operation: deployEvent.operation,
+              status: deployEvent.status,
+              raw: deployEvent.raw,
+              observedAt: deployEvent.observedAt,
+            },
+          });
+        return [updatedVault];
+      });
       return reply.code(201).send(serializeJson(created));
     },
   );
@@ -696,28 +900,45 @@ export function buildServer() {
     "/users/:account/vault/withdraw",
     async (request, reply) => {
       const input = vaultOperationSchema.parse(request.body);
+      const deployEvent = await buildDeployEvent({
+        deployHash: input.deployHash,
+        operation: "vault.withdraw",
+        account: request.params.account,
+      });
       const db = createDb();
-      const [balance] = await db
-        .select()
-        .from(vaultBalances)
-        .where(eq(vaultBalances.user, request.params.account));
+      const updated = await db.transaction(async (tx) => {
+        const [balance] = await tx
+          .select()
+          .from(vaultBalances)
+          .where(eq(vaultBalances.user, request.params.account));
 
-      if (!balance || balance.available < input.amount) {
-        return reply.code(409).send({
-          status: "error",
-          message: "Insufficient available vault balance",
-        });
-      }
+        if (!balance || balance.available < input.amount) {
+          throw new HttpError(409, "Insufficient available vault balance");
+        }
 
-      const [updated] = await db
-        .update(vaultBalances)
-        .set({
-          total: balance.total - input.amount,
-          available: balance.available - input.amount,
-          updatedAt: new Date(),
-        })
-        .where(eq(vaultBalances.user, request.params.account))
-        .returning();
+        const [updatedVault] = await tx
+          .update(vaultBalances)
+          .set({
+            total: balance.total - input.amount,
+            available: balance.available - input.amount,
+            updatedAt: new Date(),
+          })
+          .where(eq(vaultBalances.user, request.params.account))
+          .returning();
+        await tx
+          .insert(deployEvents)
+          .values(deployEvent)
+          .onConflictDoUpdate({
+            target: deployEvents.deployHash,
+            set: {
+              operation: deployEvent.operation,
+              status: deployEvent.status,
+              raw: deployEvent.raw,
+              observedAt: deployEvent.observedAt,
+            },
+          });
+        return updatedVault;
+      });
 
       return serializeJson(updated);
     },

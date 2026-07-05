@@ -90,11 +90,12 @@ export async function updateIntentStatus(
   account: string,
   intentId: string,
   status: "approved" | "rejected",
+  deployHash?: string,
 ) {
   const payload = await requestJson(`/users/${account}/intents/${intentId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, deployHash }),
     })
 
   return {
@@ -103,28 +104,42 @@ export async function updateIntentStatus(
   }
 }
 
-export async function revokeIndexedMandate(account: string, mandateId: string) {
+export async function revokeIndexedMandate(
+  account: string,
+  mandateId: string,
+  deployHash: string,
+) {
   return mandateSchema.parse(
     await requestJson(`/users/${account}/mandates/${mandateId}/revoke`, {
       method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ deployHash }),
     }),
   )
 }
 
-export async function depositIndexedVault(account: string, amountMotes: bigint) {
+export async function depositIndexedVault(
+  account: string,
+  amountMotes: bigint,
+  deployHash: string,
+) {
   return vaultBalanceSchema.parse(
     await requestJson(
       `/users/${account}/vault/deposit`,
-      jsonBody({ amount: amountMotes }),
+      jsonBody({ amount: amountMotes, deployHash }),
     ),
   )
 }
 
-export async function withdrawIndexedVault(account: string, amountMotes: bigint) {
+export async function withdrawIndexedVault(
+  account: string,
+  amountMotes: bigint,
+  deployHash: string,
+) {
   return vaultBalanceSchema.parse(
     await requestJson(
       `/users/${account}/vault/withdraw`,
-      jsonBody({ amount: amountMotes }),
+      jsonBody({ amount: amountMotes, deployHash }),
     ),
   )
 }

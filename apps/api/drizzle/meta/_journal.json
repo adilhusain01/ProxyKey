@@ -15,6 +15,13 @@
       "when": 1783178494986,
       "tag": "0001_freezing_mad_thinker",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783240960675,
+      "tag": "0002_oval_crusher_hogan",
+      "breakpoints": true
     }
   ]
 }

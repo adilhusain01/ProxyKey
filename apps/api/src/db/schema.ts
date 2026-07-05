@@ -73,3 +73,21 @@ export const vaultBalances = pgTable("vault_balances", {
   available: bigint("available", { mode: "bigint" }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
 });
+
+export const deployEvents = pgTable(
+  "deploy_events",
+  {
+    deployHash: text("deploy_hash").primaryKey(),
+    operation: text("operation").notNull(),
+    account: text("account_hash").notNull(),
+    intentId: text("intent_id"),
+    mandateId: text("mandate_id"),
+    status: text("status").notNull(),
+    raw: text("raw").notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("deploy_events_account_idx").on(table.account),
+    index("deploy_events_operation_idx").on(table.operation),
+  ],
+);
