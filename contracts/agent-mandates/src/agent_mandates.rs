@@ -28,6 +28,92 @@ pub enum ProxyKeyError {
     InvalidAmount = 13,
 }
 
+#[odra::event]
+pub struct AgentRegistered {
+    pub agent: String,
+    pub name: String,
+    pub capabilities_hash: String,
+    pub status: String,
+}
+
+#[odra::event]
+pub struct IntentStaged {
+    pub intent_id: String,
+    pub user: String,
+    pub agent: String,
+    pub target: String,
+    pub amount: U512,
+    pub resource_hash: String,
+    pub nonce: String,
+}
+
+#[odra::event]
+pub struct VaultDeposited {
+    pub user: String,
+    pub amount: U512,
+}
+
+#[odra::event]
+pub struct VaultWithdrawn {
+    pub user: String,
+    pub amount: U512,
+}
+
+#[odra::event]
+pub struct IntentApproved {
+    pub intent_id: String,
+    pub user: String,
+}
+
+#[odra::event]
+pub struct IntentRejected {
+    pub intent_id: String,
+    pub user: String,
+}
+
+#[odra::event]
+pub struct MandateCreated {
+    pub mandate_id: String,
+    pub user: String,
+    pub agent: String,
+    pub scope: String,
+    pub cap: U512,
+    pub target: String,
+    pub resource_pattern_hash: String,
+    pub expiry_block: u64,
+}
+
+#[odra::event]
+pub struct MandateRevoked {
+    pub mandate_id: String,
+    pub user: String,
+}
+
+#[odra::event]
+pub struct PaymentExecuted {
+    pub mandate_id: String,
+    pub user: String,
+    pub agent: String,
+    pub settlement_account: String,
+    pub amount: U512,
+    pub target: String,
+    pub resource_hash: String,
+    pub spent: U512,
+    pub status: u8,
+}
+
+#[odra::event]
+pub struct ReceiptRecorded {
+    pub receipt_id: String,
+    pub intent_id: String,
+    pub mandate_id: String,
+    pub deploy_hash: String,
+    pub amount: U512,
+    pub target: String,
+    pub resource_hash: String,
+    pub result_hash: String,
+}
+
 #[odra::module]
 pub struct AgentMandates {
     agent_public_keys: Mapping<Address, String>,
@@ -82,12 +168,18 @@ impl AgentMandates {
     ) {
         self.require_caller(agent);
         self.agent_public_keys.set(&agent, public_key);
-        self.agent_names.set(&agent, name);
+        self.agent_names.set(&agent, name.clone());
         self.agent_metadata_uris.set(&agent, metadata_uri);
         self.agent_capabilities_hashes
-            .set(&agent, capabilities_hash);
+            .set(&agent, capabilities_hash.clone());
         self.agent_statuses
-            .set(&agent, Self::agent_status_code(status));
+            .set(&agent, Self::agent_status_code(status.clone()));
+        self.env().emit_event(AgentRegistered {
+            agent: Self::address_string(&agent),
+            name,
+            capabilities_hash,
+            status,
+        });
     }
 
     pub fn stage_intent(
@@ -113,20 +205,35 @@ impl AgentMandates {
         self.nonce_used.set(&nonce_key, true);
         self.intent_users.set(&intent_id, user);
         self.intent_agents.set(&intent_id, agent);
-        self.intent_targets.set(&intent_id, target);
+        self.intent_targets.set(&intent_id, target.clone());
         self.intent_actions.set(&intent_id, action);
         self.intent_amounts.set(&intent_id, amount);
-        self.intent_resource_hashes.set(&intent_id, resource_hash);
+        self.intent_resource_hashes.set(&intent_id, resource_hash.clone());
         self.intent_payload_hashes.set(&intent_id, payload_hash);
-        self.intent_nonces.set(&intent_id, nonce);
+        self.intent_nonces.set(&intent_id, nonce.clone());
         self.intent_statuses.set(&intent_id, STATUS_PENDING);
+        self.env().emit_event(IntentStaged {
+            intent_id: intent_id.clone(),
+            user: Self::address_string(&user),
+            agent: Self::address_string(&agent),
+            target,
+            amount,
+            resource_hash,
+            nonce,
+        });
         intent_id
     }
 
-    pub fn deposit(&mut self, user: Address, amount: U512) {
+    #[odra(payable)]
+    pub fn deposit(&mut self, user: Address) {
         self.require_caller(user);
+        let amount = self.env().attached_value();
         self.require_positive(amount);
         self.vault_balances.add(&user, amount);
+        self.env().emit_event(VaultDeposited {
+            user: Self::address_string(&user),
+            amount,
+        });
     }
 
     pub fn withdraw(&mut self, user: Address, amount: U512) {
@@ -137,6 +244,11 @@ impl AgentMandates {
             self.env().revert(ProxyKeyError::InsufficientVaultBalance);
         }
         self.vault_balances.subtract(&user, amount);
+        self.env().transfer_tokens(&user, &amount);
+        self.env().emit_event(VaultWithdrawn {
+            user: Self::address_string(&user),
+            amount,
+        });
     }
 
     pub fn approve_intent(&mut self, intent_id: String, user: Address) {
@@ -149,6 +261,10 @@ impl AgentMandates {
             self.env().revert(ProxyKeyError::NotMandateOwner);
         }
         self.intent_statuses.set(&intent_id, STATUS_APPROVED);
+        self.env().emit_event(IntentApproved {
+            intent_id,
+            user: Self::address_string(&user),
+        });
     }
 
     pub fn reject_intent(&mut self, intent_id: String, user: Address) {
@@ -161,6 +277,10 @@ impl AgentMandates {
             self.env().revert(ProxyKeyError::NotMandateOwner);
         }
         self.intent_statuses.set(&intent_id, STATUS_REJECTED);
+        self.env().emit_event(IntentRejected {
+            intent_id,
+            user: Self::address_string(&user),
+        });
     }
 
     pub fn create_mandate(
@@ -180,14 +300,24 @@ impl AgentMandates {
         self.mandate_users.set(&mandate_id, user);
         self.mandate_agents.set(&mandate_id, agent);
         self.mandate_scopes
-            .set(&mandate_id, Self::mandate_scope_code(scope));
+            .set(&mandate_id, Self::mandate_scope_code(scope.clone()));
         self.mandate_caps.set(&mandate_id, cap);
         self.mandate_spent.set(&mandate_id, U512::zero());
-        self.mandate_targets.set(&mandate_id, target);
+        self.mandate_targets.set(&mandate_id, target.clone());
         self.mandate_resource_pattern_hashes
-            .set(&mandate_id, resource_pattern_hash);
+            .set(&mandate_id, resource_pattern_hash.clone());
         self.mandate_expiry_blocks.set(&mandate_id, expiry_block);
         self.mandate_statuses.set(&mandate_id, STATUS_ACTIVE);
+        self.env().emit_event(MandateCreated {
+            mandate_id,
+            user: Self::address_string(&user),
+            agent: Self::address_string(&agent),
+            scope,
+            cap,
+            target,
+            resource_pattern_hash,
+            expiry_block,
+        });
     }
 
     pub fn revoke_mandate(&mut self, mandate_id: String, user: Address) {
@@ -200,12 +330,17 @@ impl AgentMandates {
             self.env().revert(ProxyKeyError::NotMandateOwner);
         }
         self.mandate_statuses.set(&mandate_id, STATUS_REVOKED);
+        self.env().emit_event(MandateRevoked {
+            mandate_id,
+            user: Self::address_string(&user),
+        });
     }
 
     pub fn execute_payment(
         &mut self,
         mandate_id: String,
         agent: Address,
+        settlement_account: Address,
         amount: U512,
         target: String,
         resource_hash: String,
@@ -256,12 +391,26 @@ impl AgentMandates {
         }
 
         self.vault_balances.subtract(&user, amount);
+        self.env().transfer_tokens(&settlement_account, &amount);
         self.mandate_spent.set(&mandate_id, next_spent);
+        let mut status = STATUS_ACTIVE;
         if next_spent == cap
             || self.mandate_scopes.get_or_default(&mandate_id) == SCOPE_SINGLE_INTENT
         {
             self.mandate_statuses.set(&mandate_id, STATUS_EXHAUSTED);
+            status = STATUS_EXHAUSTED;
         }
+        self.env().emit_event(PaymentExecuted {
+            mandate_id,
+            user: Self::address_string(&user),
+            agent: Self::address_string(&agent),
+            settlement_account: Self::address_string(&settlement_account),
+            amount,
+            target,
+            resource_hash,
+            spent: next_spent,
+            status,
+        });
     }
 
     pub fn record_receipt(
@@ -280,13 +429,23 @@ impl AgentMandates {
             .mandate_agents
             .get_or_revert(&mandate_id, ProxyKeyError::MandateNotFound);
         self.require_caller(agent);
-        self.receipt_intent_ids.set(&receipt_id, intent_id);
-        self.receipt_mandate_ids.set(&receipt_id, mandate_id);
-        self.receipt_deploy_hashes.set(&receipt_id, deploy_hash);
+        self.receipt_intent_ids.set(&receipt_id, intent_id.clone());
+        self.receipt_mandate_ids.set(&receipt_id, mandate_id.clone());
+        self.receipt_deploy_hashes.set(&receipt_id, deploy_hash.clone());
         self.receipt_amounts.set(&receipt_id, amount);
-        self.receipt_targets.set(&receipt_id, target);
-        self.receipt_resource_hashes.set(&receipt_id, resource_hash);
-        self.receipt_result_hashes.set(&receipt_id, result_hash);
+        self.receipt_targets.set(&receipt_id, target.clone());
+        self.receipt_resource_hashes.set(&receipt_id, resource_hash.clone());
+        self.receipt_result_hashes.set(&receipt_id, result_hash.clone());
+        self.env().emit_event(ReceiptRecorded {
+            receipt_id,
+            intent_id,
+            mandate_id,
+            deploy_hash,
+            amount,
+            target,
+            resource_hash,
+            result_hash,
+        });
     }
 
     pub fn agent_status(&self, agent: Address) -> u8 {
@@ -364,6 +523,10 @@ impl AgentMandates {
     fn nonce_key(agent: &Address, nonce: &String) -> String {
         format!("{:?}:{}", agent, nonce)
     }
+
+    fn address_string(address: &Address) -> String {
+        format!("{:?}", address)
+    }
 }
 
 trait MappingGetOrRevert<K, V> {
@@ -383,7 +546,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use odra::host::{Deployer, NoArgs};
+    use odra::host::{Deployer, HostRef, NoArgs};
 
     fn deploy() -> (odra::host::HostEnv, AgentMandatesHostRef) {
         let env = odra_test::env();
@@ -410,6 +573,15 @@ mod tests {
 
         env.set_caller(agent);
         register_agent(&mut contract, agent);
+        assert!(env.emitted_event(
+            &contract,
+            AgentRegistered {
+                agent: AgentMandates::address_string(&agent),
+                name: "RWA Sentinel".to_string(),
+                capabilities_hash: "hash-capabilities".to_string(),
+                status: "active".to_string(),
+            },
+        ));
         let intent_id = contract.stage_intent(
             "intent-rwa-001".to_string(),
             user,
@@ -423,6 +595,18 @@ mod tests {
         );
 
         assert_eq!(contract.intent_status(intent_id), STATUS_PENDING);
+        assert!(env.emitted_event(
+            &contract,
+            IntentStaged {
+                intent_id: "intent-rwa-001".to_string(),
+                user: AgentMandates::address_string(&user),
+                agent: AgentMandates::address_string(&agent),
+                target: "rwa-risk-api".to_string(),
+                amount: U512::from(2_500_u64),
+                resource_hash: "hash-rwa-resource".to_string(),
+                nonce: "nonce-001".to_string(),
+            },
+        ));
         assert!(contract
             .try_stage_intent(
                 "intent-rwa-002".to_string(),
@@ -461,7 +645,14 @@ mod tests {
 
         env.set_caller(user);
         contract.approve_intent(intent_id.clone(), user);
-        contract.deposit(user, U512::from(10_000_u64));
+        contract.with_tokens(U512::from(10_000_u64)).deposit(user);
+        assert!(env.emitted_event(
+            &contract,
+            VaultDeposited {
+                user: AgentMandates::address_string(&user),
+                amount: U512::from(10_000_u64),
+            },
+        ));
         contract.create_mandate(
             mandate_id.clone(),
             user,
@@ -476,6 +667,7 @@ mod tests {
         env.set_caller(agent);
         contract.execute_payment(
             mandate_id.clone(),
+            agent,
             agent,
             U512::from(2_500_u64),
             "rwa-risk-api".to_string(),
@@ -495,6 +687,33 @@ mod tests {
 
         assert_eq!(contract.vault_balance(user), U512::from(7_500_u64));
         assert_eq!(contract.mandate_spent(mandate_id), U512::from(2_500_u64));
+        assert!(env.emitted_event(
+            &contract,
+            PaymentExecuted {
+                mandate_id: "mandate-001".to_string(),
+                user: AgentMandates::address_string(&user),
+                agent: AgentMandates::address_string(&agent),
+                settlement_account: AgentMandates::address_string(&agent),
+                amount: U512::from(2_500_u64),
+                target: "rwa-risk-api".to_string(),
+                resource_hash: "hash-rwa-resource".to_string(),
+                spent: U512::from(2_500_u64),
+                status: STATUS_ACTIVE,
+            },
+        ));
+        assert!(env.emitted_event(
+            &contract,
+            ReceiptRecorded {
+                receipt_id: "receipt-001".to_string(),
+                intent_id: "intent-rwa-001".to_string(),
+                mandate_id: "mandate-001".to_string(),
+                deploy_hash: "deploy-hash".to_string(),
+                amount: U512::from(2_500_u64),
+                target: "rwa-risk-api".to_string(),
+                resource_hash: "hash-rwa-resource".to_string(),
+                result_hash: "hash-result".to_string(),
+            },
+        ));
         assert_eq!(
             contract.receipt_result_hash("receipt-001".to_string()),
             "hash-result".to_string()
@@ -512,7 +731,7 @@ mod tests {
         register_agent(&mut contract, agent);
 
         env.set_caller(user);
-        contract.deposit(user, U512::from(10_000_u64));
+        contract.with_tokens(U512::from(10_000_u64)).deposit(user);
         contract.create_mandate(
             mandate_id.clone(),
             user,
@@ -529,6 +748,7 @@ mod tests {
         assert!(contract
             .try_execute_payment(
                 mandate_id,
+                agent,
                 agent,
                 U512::from(2_500_u64),
                 "rwa-risk-api".to_string(),

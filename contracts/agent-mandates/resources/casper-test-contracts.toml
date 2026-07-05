@@ -1,6 +1,6 @@
-last_updated = "2026-07-05T14:45:12Z"
+last_updated = "2026-07-05T20:24:04Z"
 
 [[contracts]]
 name = "AgentMandates"
 package_name = "AgentMandates"
-package_hash = "hash-2c26789c896fdb3500d760be852471234b1778dce90863ee05f5c7eb0ef34667"
+package_hash = "hash-ea3286e01d2a2631293212506ea22e18eea25b1336e1b5cf06d493bb55a1f3b7"

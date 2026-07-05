@@ -15,6 +15,7 @@ The contract is implemented as one `AgentMandates` Odra module because execution
 cargo +nightly test --manifest-path contracts/agent-mandates/Cargo.toml
 cd contracts/agent-mandates && cargo odra build
 cd contracts/agent-mandates && cargo odra schema
+pnpm contracts:session:build
 cargo +nightly run --manifest-path contracts/agent-mandates/Cargo.toml --bin proxykey_agent_mandates_cli -- --help
 ```
 
@@ -36,14 +37,15 @@ Use a funded Casper Testnet account for `ODRA_CASPER_LIVENET_SECRET_KEY_PATH`. D
 
 Current Testnet deployment:
 
-- package hash: `hash-2c26789c896fdb3500d760be852471234b1778dce90863ee05f5c7eb0ef34667`
-- latest deploy transaction: `d4c0a9161efcc1cb04102a55523326788ff1270e0e283e20b02d6295e8087ccb`
+- package hash: `hash-ea3286e01d2a2631293212506ea22e18eea25b1336e1b5cf06d493bb55a1f3b7`
+- latest deploy transaction: `163ee424d694b092b3c0959f1612674396e0389a4f407bc6d3c3e1bfb94eea51`
 
 Generated artifacts:
 
 - `wasm/AgentMandates.wasm`
 - `resources/casper_contract_schemas/agent_mandates_schema.json`
 - `resources/legacy/agent_mandates_schema.json`
+- `session/deposit/wasm/proxykey_deposit_session.wasm`
 
 ## Covered Behavior
 
@@ -53,7 +55,9 @@ The current tests cover:
 - intent staging
 - nonce replay rejection
 - user caller checks
-- explicit-amount vault deposits
+- payable CSPR vault deposits through the deposit session Wasm
+- CSPR vault withdrawals
+- CSPR settlement transfer to `settlement_account` during authorized execution
 - delegated mandate cap enforcement
 - target enforcement
 - resource hash enforcement
@@ -74,6 +78,6 @@ The current tests cover:
 - `execute_payment`
 - `record_receipt`
 
-## Remaining On-Chain Work
+## Event Coverage
 
-The package is deployed to Casper Testnet. Remaining hardening is real CSPR custody settlement for the vault and emitted contract messages for direct event indexing.
+The deployed package emits Odra contract events for `AgentRegistered`, `IntentStaged`, `VaultDeposited`, `VaultWithdrawn`, `IntentApproved`, `IntentRejected`, `MandateCreated`, `MandateRevoked`, `PaymentExecuted`, and `ReceiptRecorded`.

@@ -142,19 +142,14 @@
           "is_ref": false,
           "is_slice": false,
           "is_required": true
-        },
-        {
-          "name": "amount",
-          "ty": "U512",
-          "is_ref": false,
-          "is_slice": false,
-          "is_required": true
         }
       ],
       "is_mutable": true,
       "return_ty": "Unit",
       "ty": "Public",
-      "attributes": []
+      "attributes": [
+        "Payable"
+      ]
     },
     {
       "name": "withdraw",
@@ -325,6 +320,13 @@
         },
         {
           "name": "agent",
+          "ty": "Key",
+          "is_ref": false,
+          "is_slice": false,
+          "is_required": true
+        },
+        {
+          "name": "settlement_account",
           "ty": "Key",
           "is_ref": false,
           "is_slice": false,

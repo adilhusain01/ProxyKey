@@ -131,9 +131,9 @@
           "optional": false
         },
         {
-          "name": "amount",
+          "name": "__cargo_purse",
           "description": null,
-          "ty": "U512",
+          "ty": "URef",
           "optional": false
         }
       ],
@@ -300,6 +300,12 @@
         },
         {
           "name": "agent",
+          "description": null,
+          "ty": "Key",
+          "optional": false
+        },
+        {
+          "name": "settlement_account",
           "description": null,
           "ty": "Key",
           "optional": false

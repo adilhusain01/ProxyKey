@@ -51,6 +51,7 @@ const casperSdk = CasperSdk as unknown as {
     fromMap(args: Record<string, unknown>): unknown;
   };
   CLValue: {
+    newCLByteArray(value: ArrayLike<number>): unknown;
     newCLKey(value: unknown): unknown;
     newCLString(value: string): unknown;
     newCLUInt512(value: string): unknown;
@@ -72,12 +73,23 @@ const casperSdk = CasperSdk as unknown as {
       toJSON(): unknown;
     };
   };
+  SessionBuilder: new () => {
+    from(publicKey: unknown): unknown;
+    wasm(moduleBytes: Uint8Array): unknown;
+    runtimeArgs(args: unknown): unknown;
+    chainName(chainName: string): unknown;
+    payment(paymentMotes: number): unknown;
+    build(): {
+      hash: { toJSON(): string };
+      toJSON(): unknown;
+    };
+  };
   PublicKey: {
     fromHex(publicKeyHex: string): unknown;
   };
 };
 
-const ACCOUNT_KEY_ARGS = new Set(["user", "agent"]);
+const ACCOUNT_KEY_ARGS = new Set(["user", "agent", "settlement_account"]);
 
 export function createSigningPayload<TArgs extends Record<string, unknown>>(
   request: DeployRequest<TArgs>,
@@ -106,6 +118,17 @@ function normalizeContractHash(contractHash: string): string {
     .replace(/^package-/, "")
     .replace(/^hash-/, "")
     .replace(/^0x/, "");
+}
+
+function contractHashToByteArray(contractHash: string): number[] {
+  const normalized = normalizeContractHash(contractHash);
+  if (!/^[\da-fA-F]{64}$/.test(normalized)) {
+    throw new Error("Casper contract package hash must be 32 bytes");
+  }
+
+  return Array.from({ length: 32 }, (_, index) =>
+    Number.parseInt(normalized.slice(index * 2, index * 2 + 2), 16),
+  );
 }
 
 function encodeRuntimeArg(name: string, value: unknown): unknown {
@@ -156,6 +179,35 @@ export function buildContractCallTransaction<TArgs extends Record<string, unknow
   transaction.runtimeArgs(runtimeArgsFromRecord(prepared.request.args));
   transaction.chainName(prepared.network.chainName);
   transaction.payment(Number(prepared.request.paymentMotes));
+
+  const built = transaction.build();
+  return {
+    transaction: built.toJSON(),
+    transactionHash: built.hash.toJSON(),
+  };
+}
+
+export function buildVaultDepositSessionTransaction(
+  contractHash: string,
+  wasmBytes: Uint8Array,
+  signingPublicKeyHex: string,
+  input: { user: string; amount: bigint },
+  network: CasperNetworkConfig = DEFAULT_TESTNET_CONFIG,
+): CsprClickTransactionPayload {
+  const transaction = new casperSdk.SessionBuilder();
+  transaction.from(casperSdk.PublicKey.fromHex(signingPublicKeyHex));
+  transaction.wasm(wasmBytes);
+  transaction.runtimeArgs(
+    casperSdk.Args.fromMap({
+      package_hash: casperSdk.CLValue.newCLByteArray(
+        contractHashToByteArray(contractHash),
+      ),
+      user: casperSdk.CLValue.newCLKey(casperSdk.Key.newKey(input.user)),
+      amount: casperSdk.CLValue.newCLUInt512(input.amount.toString()),
+    }),
+  );
+  transaction.chainName(network.chainName);
+  transaction.payment(3_000_000_000);
 
   const built = transaction.build();
   return {
@@ -306,6 +358,7 @@ export function prepareExecutePaymentDeploy(
   input: {
     mandateId: string;
     agent: string;
+    settlementAccount: string;
     amount: bigint;
     target: string;
     resourceHash: string;
@@ -319,6 +372,7 @@ export function prepareExecutePaymentDeploy(
     args: {
       mandate_id: input.mandateId,
       agent: input.agent,
+      settlement_account: input.settlementAccount,
       amount: input.amount,
       target: input.target,
       resource_hash: input.resourceHash,

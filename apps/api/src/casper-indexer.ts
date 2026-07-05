@@ -22,8 +22,9 @@ export interface CasperDeployVerification {
 }
 
 export interface ContractCallExpectation {
-  entrypoint: string;
+  entrypoint?: string | undefined;
   packageHash?: string | undefined;
+  sessionWasmSha256?: string | undefined;
   args?: Record<string, string | bigint | undefined> | undefined;
 }
 
@@ -137,6 +138,11 @@ function findEntrypoint(raw: unknown): string | undefined {
   return undefined;
 }
 
+function findModuleBytes(raw: unknown): string | undefined {
+  const moduleBytes = findObjectWithKey(raw, "module_bytes")?.module_bytes;
+  return typeof moduleBytes === "string" ? moduleBytes : undefined;
+}
+
 function findPackageHash(raw: unknown): string | undefined {
   const byPackageHash = findObjectWithKey(raw, "byPackageHash")?.byPackageHash;
   if (byPackageHash && typeof byPackageHash === "object") {
@@ -155,6 +161,62 @@ function findPackageHash(raw: unknown): string | undefined {
   return undefined;
 }
 
+function parseU512Bytes(hex: string): string {
+  const buffer = Buffer.from(hex, "hex");
+  const byteLength = buffer.at(0) ?? 0;
+  let value = 0n;
+
+  for (let index = 0; index < byteLength; index += 1) {
+    value += BigInt(buffer.at(index + 1) ?? 0) << BigInt(index * 8);
+  }
+
+  return value.toString();
+}
+
+function parseUInt64Bytes(hex: string): string {
+  const buffer = Buffer.from(hex, "hex");
+  let value = 0n;
+
+  for (let index = 0; index < buffer.length; index += 1) {
+    value += BigInt(buffer.at(index) ?? 0) << BigInt(index * 8);
+  }
+
+  return value.toString();
+}
+
+function parseStringBytes(hex: string): string {
+  const buffer = Buffer.from(hex, "hex");
+  const length = buffer.readUInt32LE(0);
+  return buffer.subarray(4, 4 + length).toString("utf8");
+}
+
+function parseKeyBytes(hex: string): string {
+  if (hex.startsWith("00") && hex.length >= 66) {
+    return `account-hash-${hex.slice(2, 66)}`;
+  }
+
+  return hex;
+}
+
+function parseNamedArgValue(value: { bytes?: unknown; cl_type?: unknown; parsed?: unknown }) {
+  if (value.parsed !== undefined) return String(value.parsed);
+  if (typeof value.bytes !== "string") return "";
+
+  if (value.cl_type === "U512") return parseU512Bytes(value.bytes);
+  if (value.cl_type === "U64") return parseUInt64Bytes(value.bytes);
+  if (value.cl_type === "String") return parseStringBytes(value.bytes);
+  if (value.cl_type === "Key") return parseKeyBytes(value.bytes);
+  if (
+    value.cl_type &&
+    typeof value.cl_type === "object" &&
+    "ByteArray" in value.cl_type
+  ) {
+    return value.bytes.toLowerCase();
+  }
+
+  return value.bytes;
+}
+
 function parseNamedArgs(raw: unknown): Record<string, string> {
   const namedArgs = findObjectWithKey(raw, "Named")?.Named;
   if (!Array.isArray(namedArgs)) return {};
@@ -162,11 +224,50 @@ function parseNamedArgs(raw: unknown): Record<string, string> {
   return Object.fromEntries(
     namedArgs
       .filter(
-        (item): item is [string, { parsed?: unknown }] =>
+        (item): item is [
+          string,
+          { bytes?: unknown; cl_type?: unknown; parsed?: unknown },
+        ] =>
           Array.isArray(item) && typeof item[0] === "string",
       )
-      .map(([name, value]) => [name, String(value?.parsed ?? "")]),
+      .map(([name, value]) => [name, parseNamedArgValue(value)]),
   );
+}
+
+function normalizeComparableArg(value: string) {
+  const maybeHash = normalizeHash(value);
+  return maybeHash && /^[\da-f]{64}$/.test(maybeHash) ? maybeHash : value;
+}
+
+export function extractCasperContractMessages(raw: unknown) {
+  const messages: Array<Record<string, unknown>> = [];
+
+  function visit(value: unknown) {
+    if (!value || typeof value !== "object") return;
+
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item);
+      return;
+    }
+
+    const record = value as Record<string, unknown>;
+    const hasMessageShape =
+      "message" in record ||
+      "payload" in record ||
+      "topic_name" in record ||
+      "topic" in record ||
+      "entity_hash" in record ||
+      "message_hash" in record;
+
+    if (hasMessageShape && ("topic_name" in record || "topic" in record || "message" in record)) {
+      messages.push(record);
+    }
+
+    for (const child of Object.values(record)) visit(child);
+  }
+
+  visit(raw);
+  return messages;
 }
 
 export function assertVerifiedContractCall(
@@ -174,27 +275,46 @@ export function assertVerifiedContractCall(
   expectation: ContractCallExpectation,
 ) {
   const entrypoint = findEntrypoint(verification.raw);
-  if (entrypoint !== expectation.entrypoint) {
+  if (expectation.entrypoint && entrypoint !== expectation.entrypoint) {
     throw new Error(
       `Casper transaction called ${entrypoint ?? "unknown"} instead of ${expectation.entrypoint}`,
     );
   }
 
+  if (expectation.sessionWasmSha256) {
+    const moduleBytes = findModuleBytes(verification.raw);
+    if (!moduleBytes) {
+      throw new Error("Casper transaction did not include session Wasm");
+    }
+
+    const actualSha256 = crypto
+      .createHash("sha256")
+      .update(Buffer.from(moduleBytes, "hex"))
+      .digest("hex");
+
+    if (actualSha256 !== expectation.sessionWasmSha256.toLowerCase()) {
+      throw new Error("Casper transaction used a different session Wasm");
+    }
+  }
+
   const expectedPackageHash = normalizeHash(
     expectation.packageHash ?? process.env.PROXYKEY_CONTRACT_HASH,
   );
+  const actualArgs = parseNamedArgs(verification.raw);
   if (expectedPackageHash) {
-    const actualPackageHash = findPackageHash(verification.raw);
-    if (actualPackageHash && actualPackageHash !== expectedPackageHash) {
+    const actualPackageHash = findPackageHash(verification.raw) ?? actualArgs.package_hash;
+    if (actualPackageHash && normalizeHash(actualPackageHash) !== expectedPackageHash) {
       throw new Error("Casper transaction targeted a different contract package");
     }
   }
 
-  const actualArgs = parseNamedArgs(verification.raw);
   for (const [name, expectedValue] of Object.entries(expectation.args ?? {})) {
     if (expectedValue === undefined) continue;
     const actual = actualArgs[name];
-    if (actual !== undefined && actual !== String(expectedValue)) {
+    if (actual === undefined) {
+      throw new Error(`Casper transaction arg ${name} was not present`);
+    }
+    if (normalizeComparableArg(actual) !== normalizeComparableArg(String(expectedValue))) {
       throw new Error(`Casper transaction arg ${name} did not match indexed value`);
     }
   }

@@ -17,6 +17,7 @@ packages/*/.turbo
 packages/*/dist
 
 contracts/*/target
+contracts/**/target
 
 artifacts/screenshots
 

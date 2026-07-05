@@ -1,4 +1,5 @@
 import {
+  buildVaultDepositSessionTransaction,
   buildContractCallTransaction,
   type PreparedDeploy,
 } from "@proxykey/casper"
@@ -62,6 +63,52 @@ export async function sendPreparedDeploy(
 
   const signingPublicKey = getActivePublicKey(sdk)
   const payload = buildContractCallTransaction(prepared, signingPublicKey)
+  const result = await sdk.send(payload.transaction as object, signingPublicKey, true)
+
+  if (!result || result.cancelled) {
+    throw new Error("Wallet signing was cancelled")
+  }
+
+  if (result.error) {
+    throw new Error(result.error)
+  }
+
+  const deployHash = result.transactionHash ?? result.deployHash ?? payload.transactionHash
+
+  if (!deployHash) {
+    throw new Error("CSPR.click did not return a deploy hash")
+  }
+
+  return deployHash
+}
+
+export async function sendVaultDepositSession(input: {
+  user: string
+  amount: bigint
+}) {
+  const sdk = getCsprClickSdk()
+
+  if (!sdk) {
+    throw new Error("CSPR.click SDK is not loaded")
+  }
+
+  const signingPublicKey = getActivePublicKey(sdk)
+  const wasmUrl =
+    (import.meta.env.VITE_PROXYKEY_DEPOSIT_SESSION_WASM_URL as string | undefined) ??
+    "/wasm/proxykey_deposit_session.wasm"
+  const response = await fetch(wasmUrl)
+
+  if (!response.ok) {
+    throw new Error(`Could not load ProxyKey deposit session Wasm: ${response.status}`)
+  }
+
+  const wasmBytes = new Uint8Array(await response.arrayBuffer())
+  const payload = buildVaultDepositSessionTransaction(
+    requireProxyKeyContractHash(),
+    wasmBytes,
+    signingPublicKey,
+    input,
+  )
   const result = await sdk.send(payload.transaction as object, signingPublicKey, true)
 
   if (!result || result.cancelled) {

@@ -11,7 +11,8 @@
     "lint": "turbo lint",
     "contracts:test": "cargo +nightly test --manifest-path contracts/agent-mandates/Cargo.toml",
     "contracts:build": "cd contracts/agent-mandates && cargo odra build",
-    "contracts:schema": "cd contracts/agent-mandates && cargo odra schema"
+    "contracts:schema": "cd contracts/agent-mandates && cargo odra schema",
+    "contracts:session:build": "cargo +nightly-2024-09-17 build --manifest-path contracts/agent-mandates/session/deposit/Cargo.toml --target wasm32-unknown-unknown --release && mkdir -p contracts/agent-mandates/session/deposit/wasm apps/web/public/wasm && cp contracts/agent-mandates/session/deposit/target/wasm32-unknown-unknown/release/proxykey_deposit_session.wasm contracts/agent-mandates/session/deposit/wasm/proxykey_deposit_session.wasm && cp contracts/agent-mandates/session/deposit/target/wasm32-unknown-unknown/release/proxykey_deposit_session.wasm apps/web/public/wasm/proxykey_deposit_session.wasm"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

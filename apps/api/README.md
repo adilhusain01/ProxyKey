@@ -12,6 +12,7 @@ Fastify API for ProxyKey indexed state, x402 RWA payment requirements, and local
 - Record receipts and expose account-scoped reads for the PWA.
 - Verify submitted deploy or transaction hashes against Casper Testnet RPC before mutating indexed state.
 - Record verified deploy events for account and hash-level audit views.
+- Verify vault deposit session Wasm by SHA-256 before indexing funded CSPR custody.
 
 ## Commands
 
@@ -48,6 +49,6 @@ pnpm --filter @proxykey/api db:migrate
 
 ## Authority Model
 
-PostgreSQL is an index and local development coordination layer. Index writes for agent registration, intent staging, vault operations, approvals, direct mandate creation, revocation, execution, x402 payment verification, and receipt recording require Casper deploy or transaction hashes in the request payload. The API polls Casper RPC through `CASPER_NODE_RPC_URL`, verifies the transaction is finalized, decodes the contract entrypoint/runtime args against the expected operation, and records confirmed hashes in `deploy_events` before applying the corresponding state update.
+PostgreSQL is an index and local development coordination layer. Index writes for agent registration, intent staging, vault operations, approvals, direct mandate creation, revocation, execution, x402 payment verification, and receipt recording require Casper deploy or transaction hashes in the request payload. The API polls Casper RPC through `CASPER_NODE_RPC_URL`, verifies the transaction is finalized, decodes the contract entrypoint/runtime args or deposit session Wasm hash against the expected operation, and records confirmed hashes in `deploy_events` before applying the corresponding state update.
 
-The final authority is the Odra contract package in `contracts/agent-mandates`, currently deployed on Casper Testnet at `hash-2c26789c896fdb3500d760be852471234b1778dce90863ee05f5c7eb0ef34667`.
+The final authority is the Odra contract package in `contracts/agent-mandates`, currently deployed on Casper Testnet at `hash-ea3286e01d2a2631293212506ea22e18eea25b1336e1b5cf06d493bb55a1f3b7`.

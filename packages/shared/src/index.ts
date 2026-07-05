@@ -178,6 +178,7 @@ export const revokeMandateInputSchema = z.object({
 
 export const executePaymentInputSchema = z.object({
   agent: accountHashSchema,
+  settlementAccount: accountHashSchema,
   intentId: z.string().min(8).optional(),
   amount: positiveAmountSchema,
   target: z.string().min(3).max(120),

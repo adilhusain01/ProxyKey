@@ -26,7 +26,7 @@ pnpm --filter @proxykey/web test
 - Wallet identity comes from CSPR.click and is stored in the local Zustand account store.
 - TanStack Query reads account-scoped data from `VITE_PROXYKEY_API_BASE_URL`.
 - Empty states are shown when the connected account has no indexed intents, mandates, receipts, or vault balance.
-- Vault deposit, vault withdraw, intent approval, and mandate revocation first build a Casper Testnet package-call transaction through `@proxykey/casper`.
+- Vault deposit first builds a Casper Testnet session transaction around `/wasm/proxykey_deposit_session.wasm`; vault withdraw, intent approval, and mandate revocation build package-call transactions through `@proxykey/casper`.
 - CSPR.click sends the transaction from the connected wallet.
 - The API index is updated only after the wallet returns a deploy or transaction hash and the API verifies the finalized entrypoint/runtime args.
 
@@ -36,8 +36,8 @@ Local development uses the official `csprclick-template` app id. Set `VITE_CSPRC
 
 Set `VITE_WALLETCONNECT_PROJECT_ID` to enable WalletConnect in the provider list.
 
-Set `VITE_PROXYKEY_CONTRACT_HASH` to the deployed ProxyKey Casper Testnet package hash before signing user actions. Current Testnet package: `hash-2c26789c896fdb3500d760be852471234b1778dce90863ee05f5c7eb0ef34667`.
+Set `VITE_PROXYKEY_CONTRACT_HASH` to the deployed ProxyKey Casper Testnet package hash before signing user actions. Current Testnet package: `hash-ea3286e01d2a2631293212506ea22e18eea25b1336e1b5cf06d493bb55a1f3b7`.
 
-## Current Limitation
+Set `VITE_PROXYKEY_DEPOSIT_SESSION_WASM_URL` to the public deposit session path. Local development uses `/wasm/proxykey_deposit_session.wasm`.
 
-The PWA sends user-sensitive actions through CSPR.click and builds transactions for the deployed Odra `AgentMandates` package. The current Testnet vault entrypoint enforces an on-chain mandate budget ledger; real CSPR custody settlement remains the next vault hardening item.
+The PWA sends user-sensitive actions through CSPR.click and never receives the user's private key.

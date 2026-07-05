@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildContractCallTransaction,
+  buildVaultDepositSessionTransaction,
   prepareApproveIntentDeploy,
-  prepareVaultDepositDeploy,
 } from "./index";
 
 const contractHash = `hash-${"1".repeat(64)}`;
@@ -10,19 +9,27 @@ const publicKey = `01${"2".repeat(64)}`;
 const user = `account-hash-${"3".repeat(64)}`;
 
 describe("casper deploy helpers", () => {
-  it("builds a CSPR.click-ready contract transaction for vault deposits", () => {
-    const prepared = prepareVaultDepositDeploy(contractHash, {
+  it("builds a CSPR.click-ready session transaction for vault deposits", () => {
+    const payload = buildVaultDepositSessionTransaction(
+      contractHash,
+      new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]),
+      publicKey,
+      {
       user,
       amount: 2_500_000_000n,
-    });
-
-    const payload = buildContractCallTransaction(prepared, publicKey);
+      },
+    );
 
     expect(payload.transactionHash).toHaveLength(64);
     expect(payload.transaction).toMatchObject({
       payload: expect.objectContaining({
         fields: expect.objectContaining({
-          entry_point: { Custom: "deposit" },
+          entry_point: "Call",
+          target: expect.objectContaining({
+            Session: expect.objectContaining({
+              module_bytes: "0061736d01000000",
+            }),
+          }),
         }),
       }),
     });

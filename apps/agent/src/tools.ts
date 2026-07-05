@@ -4,12 +4,16 @@ import { config } from "dotenv";
 import * as z from "zod/v4";
 import {
   agentProfileSchema,
+  indexedAgentProfileSchema,
   indexedReceiptInputSchema,
+  indexedStagedIntentInputSchema,
   executePaymentInputSchema,
   mandateInputSchema,
   stagedIntentInputSchema,
   type AgentProfile,
   type ExecutePaymentInput,
+  type IndexedAgentProfile,
+  type IndexedStagedIntentInput,
   type MandateInput,
   type StagedIntentInput,
 } from "@proxykey/shared";
@@ -94,6 +98,28 @@ export async function stageIntent(input: StagedIntentInput) {
   };
 }
 
+export async function indexRegisteredAgent(input: IndexedAgentProfile) {
+  const agent = indexedAgentProfileSchema.parse(input);
+  const indexed = await postApi("/agents", agent);
+
+  return {
+    status: "indexed",
+    agent,
+    indexed,
+  };
+}
+
+export async function indexStagedIntent(input: IndexedStagedIntentInput) {
+  const intent = indexedStagedIntentInputSchema.parse(input);
+  const indexed = await postApi(`/users/${intent.user}/intents`, intent);
+
+  return {
+    status: "indexed",
+    intent,
+    indexed,
+  };
+}
+
 export async function requestMandate(input: MandateInput) {
   const mandate = mandateInputSchema.parse(input);
   return {
@@ -144,6 +170,7 @@ export async function executeAuthorizedPayment(
         ? {
             mandateId: execution.mandateId,
             agent: execution.agent,
+            settlementAccount: execution.settlementAccount,
             amount: execution.amount,
             target: execution.target,
             resourceHash: execution.resourceHash,
@@ -152,6 +179,7 @@ export async function executeAuthorizedPayment(
         : {
             mandateId: execution.mandateId,
             agent: execution.agent,
+            settlementAccount: execution.settlementAccount,
             amount: execution.amount,
             target: execution.target,
             resourceHash: execution.resourceHash,
@@ -201,6 +229,8 @@ export function explainPendingApproval(input: {
 export const schemas = {
   registerAgent: agentProfileSchema,
   stageIntent: stagedIntentInputSchema,
+  indexRegisteredAgent: indexedAgentProfileSchema,
+  indexStagedIntent: indexedStagedIntentInputSchema,
   requestMandate: mandateInputSchema,
   checkMandate: z.object({
     user: z.string().min(16),

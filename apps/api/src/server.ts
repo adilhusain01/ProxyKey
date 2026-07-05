@@ -21,6 +21,7 @@ import {
   type WalletChallenge,
 } from "@proxykey/shared";
 import {
+  extractCasperContractMessages,
   getProxyKeyPackageState,
   verifyCasperContractCall,
   type IndexedOperation,
@@ -34,7 +35,12 @@ import {
   receipts,
   vaultBalances,
 } from "./db/schema";
-import { buildRwaReport, createResourceHash, verifyPaymentProof } from "./rwa";
+import {
+  buildRwaReport,
+  createResourceHash,
+  getRwaServiceAccount,
+  verifyPaymentProof,
+} from "./rwa";
 
 config({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
 
@@ -93,12 +99,14 @@ async function buildDeployEvent(input: {
   account: string;
   intentId?: string | undefined;
   mandateId?: string | undefined;
-  entrypoint: string;
+  entrypoint?: string | undefined;
+  sessionWasmSha256?: string | undefined;
   args?: Record<string, string | bigint | undefined> | undefined;
 }) {
   try {
     const verification = await verifyCasperContractCall(input.deployHash, {
       entrypoint: input.entrypoint,
+      sessionWasmSha256: input.sessionWasmSha256,
       args: input.args,
     });
     return {
@@ -183,7 +191,11 @@ export function buildServer() {
         .send({ status: "error", message: "Deploy event not indexed" });
     }
 
-    return serializeJson(event);
+    const raw = JSON.parse(event.raw) as unknown;
+    return serializeJson({
+      ...event,
+      contractMessages: extractCasperContractMessages(raw),
+    });
   });
 
   app.post<{ Body: { account: string } }>("/auth/challenge", async (request) => {
@@ -751,6 +763,7 @@ export function buildServer() {
         args: {
           mandate_id: request.params.id,
           agent: input.agent,
+          settlement_account: input.settlementAccount,
           amount: input.amount,
           target: input.target,
           resource_hash: input.resourceHash,
@@ -849,6 +862,7 @@ export function buildServer() {
           target: input.target,
           resourceHash: input.resourceHash,
           resultHash: input.resultHash,
+          settlementAccount: input.settlementAccount,
         };
         const receipt = {
           id: id("receipt", receiptInput),
@@ -994,8 +1008,10 @@ export function buildServer() {
         deployHash: input.deployHash,
         operation: "vault.deposit",
         account: request.params.account,
-        entrypoint: "deposit",
+        entrypoint: "Call",
+        sessionWasmSha256: process.env.PROXYKEY_DEPOSIT_SESSION_WASM_SHA256,
         args: {
+          package_hash: process.env.PROXYKEY_CONTRACT_HASH,
           user: request.params.account,
           amount: input.amount,
         },
@@ -1101,7 +1117,7 @@ export function buildServer() {
           scheme: "casper-testnet-mandate",
           network: "casper-test",
           amount: "2500000000",
-          payTo: "account-hash-proxykey-rwa-service",
+          payTo: getRwaServiceAccount(),
           resourceHash,
         },
       ],
@@ -1116,6 +1132,7 @@ export function buildServer() {
         await verifyCasperContractCall(proof.deployHash, {
           entrypoint: "execute_payment",
           args: {
+            settlement_account: proof.to,
             amount: proof.amount,
             resource_hash: proof.resourceHash,
           },

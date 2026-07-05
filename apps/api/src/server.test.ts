@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildServer } from "./server";
-import { RWA_SERVICE_ACCOUNT, createResourceHash } from "./rwa";
+import { createResourceHash, getRwaServiceAccount } from "./rwa";
 
 const hash =
   "0x1111111111111111111111111111111111111111111111111111111111111111";
@@ -44,7 +44,7 @@ describe("api server", () => {
         proof: {
           deployHash: hash,
           from: "account-hash-user0001",
-          to: RWA_SERVICE_ACCOUNT,
+          to: getRwaServiceAccount(),
           amount: "2500000000",
           resourceHash: createResourceHash("tokenized-treasury-note"),
           signature: "0x11111111111111111111111111111111",

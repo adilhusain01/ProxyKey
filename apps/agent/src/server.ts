@@ -4,6 +4,8 @@ import {
   executeAuthorizedPayment,
   explainPendingApproval,
   fetchRwaReport,
+  indexRegisteredAgent,
+  indexStagedIntent,
   registerAgent,
   recordReceipt,
   requestMandate,
@@ -41,6 +43,26 @@ export function buildMcpServer() {
       inputSchema: schemas.stageIntent,
     },
     async (input) => asText(await stageIntent(input)),
+  );
+
+  server.registerTool(
+    "index_registered_agent",
+    {
+      description:
+        "Index a finalized ProxyKey register_agent deploy after the agent submits it on Casper Testnet.",
+      inputSchema: schemas.indexRegisteredAgent,
+    },
+    async (input) => asText(await indexRegisteredAgent(input)),
+  );
+
+  server.registerTool(
+    "index_staged_intent",
+    {
+      description:
+        "Index a finalized ProxyKey stage_intent deploy after the agent submits it on Casper Testnet.",
+      inputSchema: schemas.indexStagedIntent,
+    },
+    async (input) => asText(await indexStagedIntent(input)),
   );
 
   server.registerTool(
