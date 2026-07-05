@@ -4,9 +4,9 @@ Fastify API for ProxyKey indexed state, x402 RWA payment requirements, and local
 
 ## Responsibilities
 
-- Register agent identities.
-- Index staged intents for connected wallet accounts.
-- Convert user approvals with deploy hashes into scoped mandates.
+- Register agent identities after confirmed `register_agent` transactions.
+- Index staged intents for connected wallet accounts after confirmed `stage_intent` transactions.
+- Convert user approvals with confirmed `create_mandate` transactions into scoped mandates.
 - Reserve vault balance for active mandate caps.
 - Execute authorized payments inside mandate scope.
 - Record receipts and expose account-scoped reads for the PWA.
@@ -40,6 +40,7 @@ pnpm --filter @proxykey/api db:migrate
 - `GET /users/:account/deploys`
 - `GET /users/:account/vault`
 - `GET /deploys/:hash`
+- `GET /contract`
 - `POST /users/:account/vault/deposit`
 - `POST /users/:account/vault/withdraw`
 - `POST /x402/rwa/report`
@@ -47,6 +48,6 @@ pnpm --filter @proxykey/api db:migrate
 
 ## Authority Model
 
-PostgreSQL is an index and local development coordination layer. User-sensitive index writes for vault operations, approvals, direct mandate creation, revocation, execution, and receipt recording require Casper deploy or transaction hashes in the request payload. The API polls Casper RPC through `CASPER_NODE_RPC_URL` and records confirmed hashes in `deploy_events` before applying the corresponding state update.
+PostgreSQL is an index and local development coordination layer. Index writes for agent registration, intent staging, vault operations, approvals, direct mandate creation, revocation, execution, x402 payment verification, and receipt recording require Casper deploy or transaction hashes in the request payload. The API polls Casper RPC through `CASPER_NODE_RPC_URL`, verifies the transaction is finalized, decodes the contract entrypoint/runtime args against the expected operation, and records confirmed hashes in `deploy_events` before applying the corresponding state update.
 
-The final authority is the Odra contract package in `contracts/agent-mandates`. The API currently verifies deploy or transaction hashes before mutating indexed state. The next production step is deploying `AgentMandates.wasm` to Casper Testnet and replacing hash-level confirmation with decoded contract events or direct contract-state reads from the deployed package.
+The final authority is the Odra contract package in `contracts/agent-mandates`, currently deployed on Casper Testnet at `hash-2c26789c896fdb3500d760be852471234b1778dce90863ee05f5c7eb0ef34667`.

@@ -123,13 +123,9 @@ impl AgentMandates {
         intent_id
     }
 
-    #[odra(payable)]
-    pub fn deposit(&mut self, user: Address) {
+    pub fn deposit(&mut self, user: Address, amount: U512) {
         self.require_caller(user);
-        let amount = self.env().attached_value();
-        if amount == U512::zero() {
-            self.env().revert(ProxyKeyError::InvalidAmount);
-        }
+        self.require_positive(amount);
         self.vault_balances.add(&user, amount);
     }
 
@@ -141,7 +137,6 @@ impl AgentMandates {
             self.env().revert(ProxyKeyError::InsufficientVaultBalance);
         }
         self.vault_balances.subtract(&user, amount);
-        self.env().transfer_tokens(&user, &amount);
     }
 
     pub fn approve_intent(&mut self, intent_id: String, user: Address) {
@@ -388,7 +383,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use odra::host::{Deployer, HostRef, NoArgs};
+    use odra::host::{Deployer, NoArgs};
 
     fn deploy() -> (odra::host::HostEnv, AgentMandatesHostRef) {
         let env = odra_test::env();
@@ -466,7 +461,7 @@ mod tests {
 
         env.set_caller(user);
         contract.approve_intent(intent_id.clone(), user);
-        contract.with_tokens(U512::from(10_000_u64)).deposit(user);
+        contract.deposit(user, U512::from(10_000_u64));
         contract.create_mandate(
             mandate_id.clone(),
             user,
@@ -517,7 +512,7 @@ mod tests {
         register_agent(&mut contract, agent);
 
         env.set_caller(user);
-        contract.with_tokens(U512::from(10_000_u64)).deposit(user);
+        contract.deposit(user, U512::from(10_000_u64));
         contract.create_mandate(
             mandate_id.clone(),
             user,

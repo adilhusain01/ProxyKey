@@ -70,11 +70,10 @@ async function getApi(path: string) {
 
 export async function registerAgent(input: AgentProfile) {
   const agent = agentProfileSchema.parse(input);
-  const indexed = await postApi("/agents", agent);
   return {
-    status: "registered",
+    status: "deploy-ready",
     agent,
-    indexed,
+    indexing: "Submit the deploy, then POST /agents with the deployHash to index the confirmed registration.",
     deploy: prepareRegisterAgentDeploy(CONTRACT_HASH, agent),
   };
 }
@@ -88,8 +87,11 @@ export async function stageIntent(input: StagedIntentInput) {
     createdAt: new Date().toISOString(),
   };
   const deploy = prepareStageIntentDeploy(CONTRACT_HASH, intent);
-  const indexed = await postApi(`/users/${staged.user}/intents`, staged);
-  return { intent, indexed, deploy };
+  return {
+    intent,
+    indexing: "Submit the deploy, then POST /users/:account/intents with the deployHash to index the confirmed intent.",
+    deploy,
+  };
 }
 
 export async function requestMandate(input: MandateInput) {

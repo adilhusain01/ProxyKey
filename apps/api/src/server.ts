@@ -11,16 +11,18 @@ import {
   approveIntentInputSchema,
   createMandateInputSchema,
   executePaymentInputSchema,
+  indexedAgentProfileSchema,
   indexedReceiptInputSchema,
+  indexedStagedIntentInputSchema,
   paymentProofSchema,
   revokeMandateInputSchema,
-  stagedIntentInputSchema,
   vaultOperationSchema,
   walletVerificationSchema,
   type WalletChallenge,
 } from "@proxykey/shared";
 import {
-  verifyCasperDeployHash,
+  getProxyKeyPackageState,
+  verifyCasperContractCall,
   type IndexedOperation,
 } from "./casper-indexer";
 import { closeDb, createDb } from "./db/client";
@@ -91,9 +93,14 @@ async function buildDeployEvent(input: {
   account: string;
   intentId?: string | undefined;
   mandateId?: string | undefined;
+  entrypoint: string;
+  args?: Record<string, string | bigint | undefined> | undefined;
 }) {
   try {
-    const verification = await verifyCasperDeployHash(input.deployHash);
+    const verification = await verifyCasperContractCall(input.deployHash, {
+      entrypoint: input.entrypoint,
+      args: input.args,
+    });
     return {
       deployHash: input.deployHash,
       operation: input.operation,
@@ -154,6 +161,13 @@ export function buildServer() {
     status: "ok",
     service: "proxykey-api",
     network: "casper-test",
+    contractPackageHash: process.env.PROXYKEY_CONTRACT_HASH ?? null,
+  }));
+
+  app.get("/contract", async () => ({
+    network: "casper-test",
+    packageHash: process.env.PROXYKEY_CONTRACT_HASH ?? null,
+    state: await getProxyKeyPackageState(),
   }));
 
   app.get<{ Params: { hash: string } }>("/deploys/:hash", async (request, reply) => {
@@ -216,32 +230,59 @@ export function buildServer() {
   });
 
   app.post("/agents", async (request, reply) => {
-    const agent = agentProfileSchema.parse(request.body);
-    const db = createDb();
-    const [created] = await db
-      .insert(agents)
-      .values({
-        accountHash: agent.accountHash,
-        publicKey: agent.publicKey,
+    const input = indexedAgentProfileSchema.parse(request.body);
+    const { deployHash: _deployHash, ...agent } = input;
+    const deployEvent = await buildDeployEvent({
+      deployHash: input.deployHash,
+      operation: "agent.register",
+      account: agent.accountHash,
+      entrypoint: "register_agent",
+      args: {
+        agent: agent.accountHash,
+        public_key: agent.publicKey,
         name: agent.name,
-        metadataUri: agent.metadataUri,
-        capabilities: JSON.stringify(agent.capabilities),
-        capabilitiesHash: agent.capabilitiesHash,
+        metadata_uri: agent.metadataUri,
+        capabilities_hash: agent.capabilitiesHash,
         status: agent.status,
-        createdAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: agents.accountHash,
-        set: {
+      },
+    });
+    const db = createDb();
+    const [created] = await db.transaction(async (tx) => {
+      const [createdAgent] = await tx
+        .insert(agents)
+        .values({
+          accountHash: agent.accountHash,
           publicKey: agent.publicKey,
           name: agent.name,
           metadataUri: agent.metadataUri,
           capabilities: JSON.stringify(agent.capabilities),
           capabilitiesHash: agent.capabilitiesHash,
           status: agent.status,
+          createdAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: agents.accountHash,
+          set: {
+            publicKey: agent.publicKey,
+            name: agent.name,
+            metadataUri: agent.metadataUri,
+            capabilities: JSON.stringify(agent.capabilities),
+            capabilitiesHash: agent.capabilitiesHash,
+            status: agent.status,
+          },
+        })
+        .returning();
+      await tx.insert(deployEvents).values(deployEvent).onConflictDoUpdate({
+        target: deployEvents.deployHash,
+        set: {
+          operation: deployEvent.operation,
+          status: deployEvent.status,
+          raw: deployEvent.raw,
+          observedAt: deployEvent.observedAt,
         },
-      })
-      .returning();
+      });
+      return [createdAgent];
+    });
 
     if (!created) {
       throw new Error("Agent registration did not return a row");
@@ -297,25 +338,57 @@ export function buildServer() {
   app.post<{ Params: { account: string } }>(
     "/users/:account/intents",
     async (request, reply) => {
-      const input = stagedIntentInputSchema.parse(request.body);
+      const input = indexedStagedIntentInputSchema.parse(request.body);
       requireMatchingAccount(request.params.account, input.user);
+      const { deployHash: _deployHash, ...stagedInput } = input;
       const db = createDb();
       const [agent] = await db
         .select()
         .from(agents)
-        .where(eq(agents.accountHash, input.agent));
+        .where(eq(agents.accountHash, stagedInput.agent));
 
       if (!agent || agent.status !== "active") {
         throw new HttpError(409, "Agent is not registered or active");
       }
 
       const intent = {
-        id: id("intent", input),
-        ...input,
+        id: id("intent", stagedInput),
+        ...stagedInput,
         status: "pending",
         createdAt: new Date(),
       };
-      const [created] = await db.insert(intents).values(intent).returning();
+      const deployEvent = await buildDeployEvent({
+        deployHash: input.deployHash,
+        operation: "intent.stage",
+        account: stagedInput.user,
+        intentId: intent.id,
+        entrypoint: "stage_intent",
+        args: {
+          intent_id: intent.id,
+          user: stagedInput.user,
+          agent: stagedInput.agent,
+          target: stagedInput.target,
+          action: stagedInput.action,
+          amount: stagedInput.amount,
+          resource_hash: stagedInput.resourceHash,
+          payload_hash: stagedInput.payloadHash,
+          nonce: stagedInput.nonce,
+        },
+      });
+      const [created] = await db.transaction(async (tx) => {
+        const [createdIntent] = await tx.insert(intents).values(intent).returning();
+        await tx.insert(deployEvents).values(deployEvent).onConflictDoUpdate({
+          target: deployEvents.deployHash,
+          set: {
+            operation: deployEvent.operation,
+            intentId: deployEvent.intentId,
+            status: deployEvent.status,
+            raw: deployEvent.raw,
+            observedAt: deployEvent.observedAt,
+          },
+        });
+        return [createdIntent];
+      });
       return reply.code(201).send(serializeJson(created));
     },
   );
@@ -324,18 +397,6 @@ export function buildServer() {
     "/users/:account/intents/:id",
     async (request, reply) => {
       const body = approveIntentInputSchema.parse(request.body);
-      if (body.status === "approved" && !body.deployHash) {
-        throw new HttpError(400, "Approved intents require a Casper deploy hash");
-      }
-      const deployEvent =
-        body.status === "approved"
-          ? await buildDeployEvent({
-              deployHash: body.deployHash!,
-              operation: "intent.approve",
-              account: request.params.account,
-              intentId: request.params.id,
-            })
-          : undefined;
       const db = createDb();
 
       const result = await db.transaction(async (tx) => {
@@ -358,25 +419,48 @@ export function buildServer() {
         }
 
         if (body.status === "rejected") {
+          const deployEvent = await buildDeployEvent({
+            deployHash: body.deployHash,
+            operation: "intent.reject",
+            account: request.params.account,
+            intentId: request.params.id,
+            entrypoint: "reject_intent",
+            args: {
+              intent_id: intent.id,
+              user: intent.user,
+            },
+          });
           const [updated] = await tx
             .update(intents)
             .set({ status: "rejected" })
             .where(eq(intents.id, intent.id))
             .returning();
+          await tx.insert(deployEvents).values(deployEvent).onConflictDoUpdate({
+            target: deployEvents.deployHash,
+            set: {
+              operation: deployEvent.operation,
+              intentId: deployEvent.intentId,
+              status: deployEvent.status,
+              raw: deployEvent.raw,
+              observedAt: deployEvent.observedAt,
+            },
+          });
           return { intent: updated, mandate: undefined };
         }
 
         const cap = body.cap ?? intent.amount;
         const resourcePatternHash = body.resourcePatternHash ?? intent.resourceHash;
         const mandate = {
-          id: id("mandate", {
-            intentId: intent.id,
-            user: intent.user,
-            agent: intent.agent,
-            scope: body.scope,
-            target: intent.target,
-            resourcePatternHash,
-          }),
+          id:
+            body.mandateId ??
+            id("mandate", {
+              intentId: intent.id,
+              user: intent.user,
+              agent: intent.agent,
+              scope: body.scope,
+              target: intent.target,
+              resourcePatternHash,
+            }),
           user: intent.user,
           agent: intent.agent,
           scope: body.scope,
@@ -387,6 +471,24 @@ export function buildServer() {
           expiryBlock: body.expiryBlock ?? defaultExpiryBlock(),
           status: "active",
         };
+        const deployEvent = await buildDeployEvent({
+          deployHash: body.deployHash,
+          operation: "mandate.create",
+          account: intent.user,
+          intentId: intent.id,
+          mandateId: mandate.id,
+          entrypoint: "create_mandate",
+          args: {
+            mandate_id: mandate.id,
+            user: mandate.user,
+            agent: mandate.agent,
+            scope: mandate.scope,
+            cap: mandate.cap,
+            target: mandate.target,
+            resource_pattern_hash: mandate.resourcePatternHash,
+            expiry_block: mandate.expiryBlock,
+          },
+        });
 
         const [existingMandate] = await tx
           .select()
@@ -436,20 +538,20 @@ export function buildServer() {
           })
           .where(eq(vaultBalances.user, intent.user));
 
-        if (deployEvent) {
-          await tx
-            .insert(deployEvents)
-            .values(deployEvent)
-            .onConflictDoUpdate({
-              target: deployEvents.deployHash,
-              set: {
-                operation: deployEvent.operation,
-                status: deployEvent.status,
-                raw: deployEvent.raw,
-                observedAt: deployEvent.observedAt,
-              },
-            });
-        }
+        await tx
+          .insert(deployEvents)
+          .values(deployEvent)
+          .onConflictDoUpdate({
+            target: deployEvents.deployHash,
+            set: {
+              operation: deployEvent.operation,
+              intentId: deployEvent.intentId,
+              mandateId: deployEvent.mandateId,
+              status: deployEvent.status,
+              raw: deployEvent.raw,
+              observedAt: deployEvent.observedAt,
+            },
+          });
 
         const [updatedIntent] = await tx
           .update(intents)
@@ -482,11 +584,6 @@ export function buildServer() {
       const input = createMandateInputSchema.parse(request.body);
       requireMatchingAccount(request.params.account, input.user);
       const { deployHash: _deployHash, ...mandateInput } = input;
-      const deployEvent = await buildDeployEvent({
-        deployHash: input.deployHash,
-        operation: "mandate.create",
-        account: input.user,
-      });
       const db = createDb();
 
       const created = await db.transaction(async (tx) => {
@@ -505,6 +602,23 @@ export function buildServer() {
           spent: 0n,
           status: "active",
         };
+        const deployEvent = await buildDeployEvent({
+          deployHash: input.deployHash,
+          operation: "mandate.create",
+          account: input.user,
+          mandateId: mandate.id,
+          entrypoint: "create_mandate",
+          args: {
+            mandate_id: mandate.id,
+            user: mandate.user,
+            agent: mandate.agent,
+            scope: mandate.scope,
+            cap: mandate.cap,
+            target: mandate.target,
+            resource_pattern_hash: mandate.resourcePatternHash,
+            expiry_block: mandate.expiryBlock,
+          },
+        });
         const [createdMandate] = await tx.insert(mandates).values(mandate).returning();
         if (!createdMandate) {
           throw new Error("Mandate creation did not return a row");
@@ -550,6 +664,11 @@ export function buildServer() {
         operation: "mandate.revoke",
         account: request.params.account,
         mandateId: request.params.id,
+        entrypoint: "revoke_mandate",
+        args: {
+          mandate_id: request.params.id,
+          user: request.params.account,
+        },
       });
       const db = createDb();
       const updated = await db.transaction(async (tx) => {
@@ -628,6 +747,15 @@ export function buildServer() {
         account: request.params.account,
         intentId: input.intentId,
         mandateId: request.params.id,
+        entrypoint: "execute_payment",
+        args: {
+          mandate_id: request.params.id,
+          agent: input.agent,
+          amount: input.amount,
+          target: input.target,
+          resource_hash: input.resourceHash,
+          current_block: input.currentBlock,
+        },
       });
       const db = createDb();
 
@@ -793,6 +921,16 @@ export function buildServer() {
       account: input.user,
       intentId: input.intentId,
       mandateId: input.mandateId,
+      entrypoint: "record_receipt",
+      args: {
+        intent_id: input.intentId,
+        mandate_id: input.mandateId,
+        deploy_hash: input.deployHash,
+        amount: input.amount,
+        target: input.target,
+        resource_hash: input.resourceHash,
+        result_hash: input.resultHash,
+      },
     });
     const db = createDb();
     const receipt = {
@@ -856,6 +994,11 @@ export function buildServer() {
         deployHash: input.deployHash,
         operation: "vault.deposit",
         account: request.params.account,
+        entrypoint: "deposit",
+        args: {
+          user: request.params.account,
+          amount: input.amount,
+        },
       });
       const now = new Date();
       const db = createDb();
@@ -904,6 +1047,11 @@ export function buildServer() {
         deployHash: input.deployHash,
         operation: "vault.withdraw",
         account: request.params.account,
+        entrypoint: "withdraw",
+        args: {
+          user: request.params.account,
+          amount: input.amount,
+        },
       });
       const db = createDb();
       const updated = await db.transaction(async (tx) => {
@@ -964,6 +1112,19 @@ export function buildServer() {
     "/x402/rwa/verify-payment",
     async (request) => {
       const proof = verifyPaymentProof(paymentProofSchema.parse(request.body.proof));
+      try {
+        await verifyCasperContractCall(proof.deployHash, {
+          entrypoint: "execute_payment",
+          args: {
+            amount: proof.amount,
+            resource_hash: proof.resourceHash,
+          },
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unknown Casper RPC error";
+        throw new HttpError(409, message);
+      }
       return {
         status: "success",
         report: buildRwaReport(request.body.asset, proof),

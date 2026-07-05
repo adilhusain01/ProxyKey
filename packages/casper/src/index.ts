@@ -12,7 +12,7 @@ export type CasperNetworkConfig = z.infer<typeof casperNetworkConfigSchema>;
 
 export const DEFAULT_TESTNET_CONFIG: CasperNetworkConfig = {
   networkName: "casper-test",
-  nodeRpcUrl: "https://rpc.testnet.casper.network/rpc",
+  nodeRpcUrl: "https://node.testnet.casper.network/rpc",
   chainName: "casper-test",
 };
 
@@ -22,6 +22,7 @@ export type ContractEntrypoint =
   | "deposit"
   | "withdraw"
   | "approve_intent"
+  | "reject_intent"
   | "create_mandate"
   | "revoke_mandate"
   | "execute_payment"
@@ -61,6 +62,7 @@ const casperSdk = CasperSdk as unknown as {
   ContractCallBuilder: new () => {
     from(publicKey: unknown): unknown;
     byHash(contractHash: string): unknown;
+    byPackageHash(packageHash: string, version?: number | null): unknown;
     entryPoint(entrypoint: string): unknown;
     runtimeArgs(args: unknown): unknown;
     chainName(chainName: string): unknown;
@@ -99,7 +101,11 @@ export function prepareDeploy<TArgs extends Record<string, unknown>>(
 }
 
 function normalizeContractHash(contractHash: string): string {
-  return contractHash.replace(/^hash-/, "").replace(/^0x/, "");
+  return contractHash
+    .replace(/^contract-package-/, "")
+    .replace(/^package-/, "")
+    .replace(/^hash-/, "")
+    .replace(/^0x/, "");
 }
 
 function encodeRuntimeArg(name: string, value: unknown): unknown {
@@ -145,7 +151,7 @@ export function buildContractCallTransaction<TArgs extends Record<string, unknow
 ): CsprClickTransactionPayload {
   const transaction = new casperSdk.ContractCallBuilder();
   transaction.from(casperSdk.PublicKey.fromHex(signingPublicKeyHex));
-  transaction.byHash(normalizeContractHash(prepared.request.contractHash));
+  transaction.byPackageHash(normalizeContractHash(prepared.request.contractHash));
   transaction.entryPoint(prepared.request.entrypoint);
   transaction.runtimeArgs(runtimeArgsFromRecord(prepared.request.args));
   transaction.chainName(prepared.network.chainName);
@@ -236,6 +242,21 @@ export function prepareApproveIntentDeploy(
   return prepareDeploy({
     contractHash,
     entrypoint: "approve_intent",
+    paymentMotes: 2_500_000_000n,
+    args: {
+      intent_id: input.intentId,
+      user: input.user,
+    },
+  });
+}
+
+export function prepareRejectIntentDeploy(
+  contractHash: string,
+  input: { intentId: string; user: string },
+): PreparedDeploy<Record<string, unknown>> {
+  return prepareDeploy({
+    contractHash,
+    entrypoint: "reject_intent",
     paymentMotes: 2_500_000_000n,
     args: {
       intent_id: input.intentId,

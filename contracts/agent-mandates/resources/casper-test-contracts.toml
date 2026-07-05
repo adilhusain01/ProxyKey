@@ -1,0 +1,6 @@
+last_updated = "2026-07-05T14:45:12Z"
+
+[[contracts]]
+name = "AgentMandates"
+package_name = "AgentMandates"
+package_hash = "hash-2c26789c896fdb3500d760be852471234b1778dce90863ee05f5c7eb0ef34667"

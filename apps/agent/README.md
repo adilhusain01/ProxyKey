@@ -24,7 +24,7 @@ pnpm --filter @proxykey/agent test
 
 ## Integration
 
-Set `PROXYKEY_API_BASE_URL` to index agent actions through the Fastify API. Tool responses also include prepared Casper deploy payloads from `packages/casper` so the same agent flow can move to deployed Casper entrypoints.
+Set `PROXYKEY_API_BASE_URL` for post-transaction indexing through the Fastify API. `register_agent` and `stage_intent` return prepared Casper deploy payloads first; the API indexes those actions only after a real Testnet deploy hash is submitted and verified.
 
 `request_mandate` returns the mandate request and prepared deploy payload, but it does not index a created user mandate. The connected user wallet signs approval in the PWA through CSPR.click.
 

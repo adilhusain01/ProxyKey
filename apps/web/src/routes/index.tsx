@@ -10,7 +10,7 @@ import {
   XCircle,
 } from "lucide-react"
 import { toast } from "sonner"
-import { prepareApproveIntentDeploy } from "@proxykey/casper"
+import { prepareMandateDeploy, prepareRejectIntentDeploy } from "@proxykey/casper"
 import { Badge } from "#/components/ui/badge"
 import { Button } from "#/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs"
@@ -40,13 +40,31 @@ function ApprovalInbox() {
 
   async function approve(intentId: string) {
     if (!account) return
+    const intent = intents.find((item) => item.id === intentId)
+    if (!intent) return
+    const mandateId = `mandate-${crypto.randomUUID()}`
+    const mandate = {
+      id: mandateId,
+      user: intent.user,
+      agent: intent.agent,
+      scope: "single-intent" as const,
+      cap: intent.amount,
+      spent: 0n,
+      target: intent.target,
+      resourcePatternHash: intent.resourceHash,
+      expiryBlock: 9_000_000n,
+      status: "active" as const,
+    }
     const deployHash = await sendPreparedDeploy(
-      prepareApproveIntentDeploy(requireProxyKeyContractHash(), {
-        intentId,
-        user: account,
-      }),
+      prepareMandateDeploy(requireProxyKeyContractHash(), mandate),
     )
-    await updateIntentStatus(account, intentId, "approved", deployHash)
+    await updateIntentStatus(account, intentId, "approved", deployHash, {
+      mandateId,
+      scope: mandate.scope,
+      cap: mandate.cap,
+      resourcePatternHash: mandate.resourcePatternHash,
+      expiryBlock: mandate.expiryBlock,
+    })
     await queryClient.invalidateQueries({ queryKey: ["proxykey", account, "intents"] })
     await queryClient.invalidateQueries({ queryKey: ["proxykey", account, "mandates"] })
     await queryClient.invalidateQueries({ queryKey: ["proxykey", account, "vault"] })
@@ -55,7 +73,13 @@ function ApprovalInbox() {
 
   async function reject(intentId: string) {
     if (!account) return
-    await updateIntentStatus(account, intentId, "rejected")
+    const deployHash = await sendPreparedDeploy(
+      prepareRejectIntentDeploy(requireProxyKeyContractHash(), {
+        intentId,
+        user: account,
+      }),
+    )
+    await updateIntentStatus(account, intentId, "rejected", deployHash)
     await queryClient.invalidateQueries({ queryKey: ["proxykey", account, "intents"] })
     toast.error("Intent rejected")
   }

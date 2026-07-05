@@ -34,6 +34,11 @@ cargo +nightly run --manifest-path contracts/agent-mandates/Cargo.toml --bin pro
 
 Use a funded Casper Testnet account for `ODRA_CASPER_LIVENET_SECRET_KEY_PATH`. Do not commit local private keys or `.env` files.
 
+Current Testnet deployment:
+
+- package hash: `hash-2c26789c896fdb3500d760be852471234b1778dce90863ee05f5c7eb0ef34667`
+- latest deploy transaction: `d4c0a9161efcc1cb04102a55523326788ff1270e0e283e20b02d6295e8087ccb`
+
 Generated artifacts:
 
 - `wasm/AgentMandates.wasm`
@@ -48,7 +53,7 @@ The current tests cover:
 - intent staging
 - nonce replay rejection
 - user caller checks
-- payable vault deposits through Odra `with_tokens`
+- explicit-amount vault deposits
 - delegated mandate cap enforcement
 - target enforcement
 - resource hash enforcement
@@ -71,4 +76,4 @@ The current tests cover:
 
 ## Remaining On-Chain Work
 
-Deploy `wasm/AgentMandates.wasm` to Casper Testnet through `proxykey_agent_mandates_cli`, set `PROXYKEY_CONTRACT_HASH`, set `VITE_PROXYKEY_CONTRACT_HASH`, and index confirmed contract events or contract state into PostgreSQL.
+The package is deployed to Casper Testnet. Remaining hardening is real CSPR custody settlement for the vault and emitted contract messages for direct event indexing.

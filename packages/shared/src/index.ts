@@ -33,6 +33,10 @@ export const agentProfileSchema = z.object({
   status: statusSchema,
 });
 
+export const indexedAgentProfileSchema = agentProfileSchema.extend({
+  deployHash: hashSchema,
+});
+
 export const intentStatusSchema = z.enum([
   "pending",
   "approved",
@@ -135,6 +139,10 @@ export const stagedIntentInputSchema = intentSchema.omit({
   createdAt: true,
 });
 
+export const indexedStagedIntentInputSchema = stagedIntentInputSchema.extend({
+  deployHash: hashSchema,
+});
+
 export const mandateInputSchema = mandateSchema.omit({
   id: true,
   spent: true,
@@ -156,11 +164,12 @@ export const indexedReceiptInputSchema = receiptInputSchema.extend({
 
 export const approveIntentInputSchema = z.object({
   status: z.enum(["approved", "rejected"]),
+  mandateId: z.string().min(8).optional(),
   scope: mandateScopeSchema.default("single-intent"),
   cap: positiveAmountSchema.optional(),
   resourcePatternHash: hashSchema.optional(),
   expiryBlock: z.coerce.bigint().positive().optional(),
-  deployHash: hashSchema.optional(),
+  deployHash: hashSchema,
 });
 
 export const revokeMandateInputSchema = z.object({
@@ -180,6 +189,7 @@ export const executePaymentInputSchema = z.object({
 
 export type AgentCapability = z.infer<typeof agentCapabilitySchema>;
 export type AgentProfile = z.infer<typeof agentProfileSchema>;
+export type IndexedAgentProfile = z.infer<typeof indexedAgentProfileSchema>;
 export type Intent = z.infer<typeof intentSchema>;
 export type Mandate = z.infer<typeof mandateSchema>;
 export type Receipt = z.infer<typeof receiptSchema>;
@@ -190,6 +200,7 @@ export type RwaReport = z.infer<typeof rwaReportSchema>;
 export type WalletChallenge = z.infer<typeof walletChallengeSchema>;
 export type WalletVerification = z.infer<typeof walletVerificationSchema>;
 export type StagedIntentInput = z.infer<typeof stagedIntentInputSchema>;
+export type IndexedStagedIntentInput = z.infer<typeof indexedStagedIntentInputSchema>;
 export type MandateInput = z.infer<typeof mandateInputSchema>;
 export type CreateMandateInput = z.infer<typeof createMandateInputSchema>;
 export type ReceiptInput = z.infer<typeof receiptInputSchema>;

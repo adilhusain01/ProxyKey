@@ -131,9 +131,9 @@
           "optional": false
         },
         {
-          "name": "__cargo_purse",
+          "name": "amount",
           "description": null,
-          "ty": "URef",
+          "ty": "U512",
           "optional": false
         }
       ],

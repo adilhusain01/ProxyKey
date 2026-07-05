@@ -6,6 +6,9 @@ const hash =
   "0x1111111111111111111111111111111111111111111111111111111111111111";
 
 describe("api server", () => {
+  process.env.CASPER_DEPLOY_VERIFY_ATTEMPTS = "1";
+  process.env.CASPER_DEPLOY_VERIFY_DELAY_MS = "1";
+
   it("serves health", async () => {
     const app = buildServer();
     const response = await app.inject({ method: "GET", url: "/health" });
@@ -31,7 +34,7 @@ describe("api server", () => {
     await app.close();
   });
 
-  it("verifies an x402 proof and returns a report", async () => {
+  it("rejects an x402 proof without a confirmed Casper payment", async () => {
     const app = buildServer();
     const response = await app.inject({
       method: "POST",
@@ -49,11 +52,8 @@ describe("api server", () => {
       },
     });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json().report).toMatchObject({
-      asset: "tokenized-treasury-note",
-      rating: "moderate-risk",
-    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ status: "error" });
     await app.close();
   });
 

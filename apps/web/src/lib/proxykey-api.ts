@@ -90,12 +90,22 @@ export async function updateIntentStatus(
   account: string,
   intentId: string,
   status: "approved" | "rejected",
-  deployHash?: string,
+  deployHash: string,
+  mandate?: {
+    mandateId?: string
+    scope?: "single-intent" | "delegated"
+    cap?: bigint
+    resourcePatternHash?: string
+    expiryBlock?: bigint
+  },
 ) {
   const payload = await requestJson(`/users/${account}/intents/${intentId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status, deployHash }),
+      body: JSON.stringify(
+        { status, deployHash, ...mandate },
+        (_, value) => (typeof value === "bigint" ? value.toString() : value),
+      ),
     })
 
   return {

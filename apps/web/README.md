@@ -26,9 +26,9 @@ pnpm --filter @proxykey/web test
 - Wallet identity comes from CSPR.click and is stored in the local Zustand account store.
 - TanStack Query reads account-scoped data from `VITE_PROXYKEY_API_BASE_URL`.
 - Empty states are shown when the connected account has no indexed intents, mandates, receipts, or vault balance.
-- Vault deposit, vault withdraw, intent approval, and mandate revocation first build a Casper contract-call transaction through `@proxykey/casper`.
+- Vault deposit, vault withdraw, intent approval, and mandate revocation first build a Casper Testnet package-call transaction through `@proxykey/casper`.
 - CSPR.click sends the transaction from the connected wallet.
-- The API index is updated only after the wallet returns a deploy or transaction hash.
+- The API index is updated only after the wallet returns a deploy or transaction hash and the API verifies the finalized entrypoint/runtime args.
 
 ## CSPR.click
 
@@ -36,8 +36,8 @@ Local development uses the official `csprclick-template` app id. Set `VITE_CSPRC
 
 Set `VITE_WALLETCONNECT_PROJECT_ID` to enable WalletConnect in the provider list.
 
-Set `VITE_PROXYKEY_CONTRACT_HASH` to the deployed ProxyKey Casper Testnet contract hash before signing user actions.
+Set `VITE_PROXYKEY_CONTRACT_HASH` to the deployed ProxyKey Casper Testnet package hash before signing user actions. Current Testnet package: `hash-2c26789c896fdb3500d760be852471234b1778dce90863ee05f5c7eb0ef34667`.
 
 ## Current Limitation
 
-The PWA sends user-sensitive actions through CSPR.click and builds transactions for the Odra `AgentMandates` ABI. Final production behavior still needs `wasm/AgentMandates.wasm` deployed to Casper Testnet and an indexer that reads confirmed contract events or contract state back into PostgreSQL.
+The PWA sends user-sensitive actions through CSPR.click and builds transactions for the deployed Odra `AgentMandates` package. The current Testnet vault entrypoint enforces an on-chain mandate budget ledger; real CSPR custody settlement remains the next vault hardening item.
