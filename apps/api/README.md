@@ -49,4 +49,4 @@ pnpm --filter @proxykey/api db:migrate
 
 PostgreSQL is an index and local development coordination layer. User-sensitive index writes for vault operations, approvals, direct mandate creation, revocation, execution, and receipt recording require Casper deploy or transaction hashes in the request payload. The API polls Casper RPC through `CASPER_NODE_RPC_URL` and records confirmed hashes in `deploy_events` before applying the corresponding state update.
 
-The final authority should be the deployed Casper contract package. The next production step is contract-event decoding from the deployed package instead of hash-level confirmation only.
+The final authority is the Odra contract package in `contracts/agent-mandates`. The API currently verifies deploy or transaction hashes before mutating indexed state. The next production step is deploying `AgentMandates.wasm` to Casper Testnet and replacing hash-level confirmation with decoded contract events or direct contract-state reads from the deployed package.

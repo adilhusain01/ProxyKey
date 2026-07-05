@@ -40,4 +40,4 @@ Set `VITE_PROXYKEY_CONTRACT_HASH` to the deployed ProxyKey Casper Testnet contra
 
 ## Current Limitation
 
-The PWA now sends user-sensitive actions through CSPR.click. Final production behavior still needs a deployed Casper Testnet contract package and an indexer that reads confirmed contract events back into PostgreSQL.
+The PWA sends user-sensitive actions through CSPR.click and builds transactions for the Odra `AgentMandates` ABI. Final production behavior still needs `wasm/AgentMandates.wasm` deployed to Casper Testnet and an indexer that reads confirmed contract events or contract state back into PostgreSQL.

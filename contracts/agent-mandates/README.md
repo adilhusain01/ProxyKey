@@ -1,17 +1,44 @@
-# ProxyKey Agent Mandates Contract Domain
+# ProxyKey Agent Mandates Contract
 
-Rust implementation of the ProxyKey mandate domain:
+Deployable Odra/Rust Casper contract for the ProxyKey mandate domain:
 
-- `AgentRegistry`
-- `IntentInbox`
-- `MandateVault`
-- `ReceiptLedger`
+- agent registry
+- intent inbox
+- mandate vault
+- receipt ledger
+
+The contract is implemented as one `AgentMandates` Odra module because execution needs shared state across agents, intents, mandates, balances, and receipts.
 
 ## Commands
 
 ```sh
-cargo test --manifest-path contracts/agent-mandates/Cargo.toml
+cargo +nightly test --manifest-path contracts/agent-mandates/Cargo.toml
+cd contracts/agent-mandates && cargo odra build
+cd contracts/agent-mandates && cargo odra schema
+cargo +nightly run --manifest-path contracts/agent-mandates/Cargo.toml --bin proxykey_agent_mandates_cli -- --help
 ```
+
+Odra 2.8.2 requires nightly Rust. This package pins `rust-toolchain` to `nightly`. `cargo odra build` also requires `wasm32-unknown-unknown`, `wasm-opt` from Binaryen, and `wasm-strip` from WABT.
+
+## Testnet Deployment
+
+The deployment CLI uses Odra livenet environment variables:
+
+```sh
+export ODRA_CASPER_LIVENET_NODE_ADDRESS="http://<casper-node>:7777/rpc"
+export ODRA_CASPER_LIVENET_CHAIN_NAME="casper-test"
+export ODRA_CASPER_LIVENET_EVENTS_URL="http://<casper-node>:9999/events"
+export ODRA_CASPER_LIVENET_SECRET_KEY_PATH="$PWD/casper_temp_private_key.pem"
+cargo +nightly run --manifest-path contracts/agent-mandates/Cargo.toml --bin proxykey_agent_mandates_cli -- deploy --deploy-mode override
+```
+
+Use a funded Casper Testnet account for `ODRA_CASPER_LIVENET_SECRET_KEY_PATH`. Do not commit local private keys or `.env` files.
+
+Generated artifacts:
+
+- `wasm/AgentMandates.wasm`
+- `resources/casper_contract_schemas/agent_mandates_schema.json`
+- `resources/legacy/agent_mandates_schema.json`
 
 ## Covered Behavior
 
@@ -20,12 +47,28 @@ The current tests cover:
 - active agent validation
 - intent staging
 - nonce replay rejection
+- user caller checks
+- payable vault deposits through Odra `with_tokens`
 - delegated mandate cap enforcement
 - target enforcement
 - resource hash enforcement
 - vault balance checks
 - revocation blocking execution
+- receipt recording
+
+## Entrypoints
+
+- `register_agent`
+- `stage_intent`
+- `deposit`
+- `withdraw`
+- `approve_intent`
+- `reject_intent`
+- `create_mandate`
+- `revoke_mandate`
+- `execute_payment`
+- `record_receipt`
 
 ## Remaining On-Chain Work
 
-This package is not yet a deployed Casper Testnet contract package. The next step is to convert the domain implementation into deployable Odra contracts, deploy to Casper Testnet, set `PROXYKEY_CONTRACT_HASH`, and index confirmed deploy events into PostgreSQL.
+Deploy `wasm/AgentMandates.wasm` to Casper Testnet through `proxykey_agent_mandates_cli`, set `PROXYKEY_CONTRACT_HASH`, set `VITE_PROXYKEY_CONTRACT_HASH`, and index confirmed contract events or contract state into PostgreSQL.

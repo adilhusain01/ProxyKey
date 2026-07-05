@@ -1,0 +1,522 @@
+{
+  "casper_contract_schema_version": 1,
+  "toolchain": "rustc 1.94.0-nightly (2f1bd3f37 2026-01-12)",
+  "authors": [],
+  "repository": null,
+  "homepage": null,
+  "contract_name": "AgentMandates",
+  "contract_version": "0.1.0",
+  "types": [],
+  "errors": [],
+  "entry_points": [
+    {
+      "name": "register_agent",
+      "description": "",
+      "is_mutable": true,
+      "arguments": [
+        {
+          "name": "agent",
+          "description": null,
+          "ty": "Key",
+          "optional": false
+        },
+        {
+          "name": "public_key",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "name",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "metadata_uri",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "capabilities_hash",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "status",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        }
+      ],
+      "return_ty": "Unit",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "stage_intent",
+      "description": "",
+      "is_mutable": true,
+      "arguments": [
+        {
+          "name": "intent_id",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "user",
+          "description": null,
+          "ty": "Key",
+          "optional": false
+        },
+        {
+          "name": "agent",
+          "description": null,
+          "ty": "Key",
+          "optional": false
+        },
+        {
+          "name": "target",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "action",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "amount",
+          "description": null,
+          "ty": "U512",
+          "optional": false
+        },
+        {
+          "name": "resource_hash",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "payload_hash",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "nonce",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        }
+      ],
+      "return_ty": "String",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "deposit",
+      "description": "",
+      "is_mutable": true,
+      "arguments": [
+        {
+          "name": "user",
+          "description": null,
+          "ty": "Key",
+          "optional": false
+        },
+        {
+          "name": "__cargo_purse",
+          "description": null,
+          "ty": "URef",
+          "optional": false
+        }
+      ],
+      "return_ty": "Unit",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "withdraw",
+      "description": "",
+      "is_mutable": true,
+      "arguments": [
+        {
+          "name": "user",
+          "description": null,
+          "ty": "Key",
+          "optional": false
+        },
+        {
+          "name": "amount",
+          "description": null,
+          "ty": "U512",
+          "optional": false
+        }
+      ],
+      "return_ty": "Unit",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "approve_intent",
+      "description": "",
+      "is_mutable": true,
+      "arguments": [
+        {
+          "name": "intent_id",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "user",
+          "description": null,
+          "ty": "Key",
+          "optional": false
+        }
+      ],
+      "return_ty": "Unit",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "reject_intent",
+      "description": "",
+      "is_mutable": true,
+      "arguments": [
+        {
+          "name": "intent_id",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "user",
+          "description": null,
+          "ty": "Key",
+          "optional": false
+        }
+      ],
+      "return_ty": "Unit",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "create_mandate",
+      "description": "",
+      "is_mutable": true,
+      "arguments": [
+        {
+          "name": "mandate_id",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "user",
+          "description": null,
+          "ty": "Key",
+          "optional": false
+        },
+        {
+          "name": "agent",
+          "description": null,
+          "ty": "Key",
+          "optional": false
+        },
+        {
+          "name": "scope",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "cap",
+          "description": null,
+          "ty": "U512",
+          "optional": false
+        },
+        {
+          "name": "target",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "resource_pattern_hash",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "expiry_block",
+          "description": null,
+          "ty": "U64",
+          "optional": false
+        }
+      ],
+      "return_ty": "Unit",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "revoke_mandate",
+      "description": "",
+      "is_mutable": true,
+      "arguments": [
+        {
+          "name": "mandate_id",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "user",
+          "description": null,
+          "ty": "Key",
+          "optional": false
+        }
+      ],
+      "return_ty": "Unit",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "execute_payment",
+      "description": "",
+      "is_mutable": true,
+      "arguments": [
+        {
+          "name": "mandate_id",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "agent",
+          "description": null,
+          "ty": "Key",
+          "optional": false
+        },
+        {
+          "name": "amount",
+          "description": null,
+          "ty": "U512",
+          "optional": false
+        },
+        {
+          "name": "target",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "resource_hash",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "current_block",
+          "description": null,
+          "ty": "U64",
+          "optional": false
+        }
+      ],
+      "return_ty": "Unit",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "record_receipt",
+      "description": "",
+      "is_mutable": true,
+      "arguments": [
+        {
+          "name": "receipt_id",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "intent_id",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "mandate_id",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "deploy_hash",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "amount",
+          "description": null,
+          "ty": "U512",
+          "optional": false
+        },
+        {
+          "name": "target",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "resource_hash",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        },
+        {
+          "name": "result_hash",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        }
+      ],
+      "return_ty": "Unit",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "agent_status",
+      "description": "",
+      "is_mutable": false,
+      "arguments": [
+        {
+          "name": "agent",
+          "description": null,
+          "ty": "Key",
+          "optional": false
+        }
+      ],
+      "return_ty": "U8",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "intent_status",
+      "description": "",
+      "is_mutable": false,
+      "arguments": [
+        {
+          "name": "intent_id",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        }
+      ],
+      "return_ty": "U8",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "mandate_status",
+      "description": "",
+      "is_mutable": false,
+      "arguments": [
+        {
+          "name": "mandate_id",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        }
+      ],
+      "return_ty": "U8",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "vault_balance",
+      "description": "",
+      "is_mutable": false,
+      "arguments": [
+        {
+          "name": "user",
+          "description": null,
+          "ty": "Key",
+          "optional": false
+        }
+      ],
+      "return_ty": "U512",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "mandate_spent",
+      "description": "",
+      "is_mutable": false,
+      "arguments": [
+        {
+          "name": "mandate_id",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        }
+      ],
+      "return_ty": "U512",
+      "is_contract_context": true,
+      "access": "public"
+    },
+    {
+      "name": "receipt_result_hash",
+      "description": "",
+      "is_mutable": false,
+      "arguments": [
+        {
+          "name": "receipt_id",
+          "description": null,
+          "ty": "String",
+          "optional": false
+        }
+      ],
+      "return_ty": "String",
+      "is_contract_context": true,
+      "access": "public"
+    }
+  ],
+  "events": [],
+  "call": {
+    "wasm_file_name": "AgentMandates.wasm",
+    "description": "",
+    "arguments": [
+      {
+        "name": "odra_cfg_package_hash_key_name",
+        "description": "The arg name for the package hash key name.",
+        "ty": "String",
+        "optional": false
+      },
+      {
+        "name": "odra_cfg_allow_key_override",
+        "description": "If true and the key specified in odra_cfg_package_hash_key_name already exists, it will be overwritten.",
+        "ty": "Bool",
+        "optional": false
+      },
+      {
+        "name": "odra_cfg_is_upgradable",
+        "description": "The arg name for the contract upgradeability setting.",
+        "ty": "Bool",
+        "optional": false
+      },
+      {
+        "name": "odra_cfg_is_upgrade",
+        "description": "The arg name for telling the installer that the contract is being upgraded.",
+        "ty": "Bool",
+        "optional": false
+      }
+    ]
+  }
+}

@@ -9,7 +9,9 @@
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "lint": "turbo lint",
-    "contracts:test": "cargo test --manifest-path contracts/agent-mandates/Cargo.toml"
+    "contracts:test": "cargo +nightly test --manifest-path contracts/agent-mandates/Cargo.toml",
+    "contracts:build": "cd contracts/agent-mandates && cargo odra build",
+    "contracts:schema": "cd contracts/agent-mandates && cargo odra schema"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

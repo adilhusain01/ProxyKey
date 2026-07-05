@@ -7,11 +7,12 @@ import {
 
 const contractHash = `hash-${"1".repeat(64)}`;
 const publicKey = `01${"2".repeat(64)}`;
+const user = `account-hash-${"3".repeat(64)}`;
 
 describe("casper deploy helpers", () => {
   it("builds a CSPR.click-ready contract transaction for vault deposits", () => {
     const prepared = prepareVaultDepositDeploy(contractHash, {
-      user: "account-hash-user0001",
+      user,
       amount: 2_500_000_000n,
     });
 
@@ -30,7 +31,7 @@ describe("casper deploy helpers", () => {
   it("keeps approve intent payloads bound to the planned entrypoint", () => {
     const prepared = prepareApproveIntentDeploy(contractHash, {
       intentId: "intent-rwa-001",
-      user: "account-hash-user0001",
+      user,
     });
 
     expect(prepared.request.entrypoint).toBe("approve_intent");

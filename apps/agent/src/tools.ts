@@ -136,13 +136,25 @@ export async function executeAuthorizedPayment(
   );
   return {
     status: "executed",
-    deploy: prepareExecutePaymentDeploy(CONTRACT_HASH, {
-      mandateId: execution.mandateId,
-      agent: execution.agent,
-      amount: execution.amount,
-      target: execution.target,
-      resourceHash: execution.resourceHash,
-    }),
+    deploy: prepareExecutePaymentDeploy(
+      CONTRACT_HASH,
+      execution.currentBlock
+        ? {
+            mandateId: execution.mandateId,
+            agent: execution.agent,
+            amount: execution.amount,
+            target: execution.target,
+            resourceHash: execution.resourceHash,
+            currentBlock: execution.currentBlock,
+          }
+        : {
+            mandateId: execution.mandateId,
+            agent: execution.agent,
+            amount: execution.amount,
+            target: execution.target,
+            resourceHash: execution.resourceHash,
+          },
+    ),
     args: execution,
     indexed,
   };

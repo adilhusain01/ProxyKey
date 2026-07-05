@@ -50,9 +50,13 @@ const casperSdk = CasperSdk as unknown as {
     fromMap(args: Record<string, unknown>): unknown;
   };
   CLValue: {
+    newCLKey(value: unknown): unknown;
     newCLString(value: string): unknown;
     newCLUInt512(value: string): unknown;
     newCLUint64(value: string): unknown;
+  };
+  Key: {
+    newKey(value: string): unknown;
   };
   ContractCallBuilder: new () => {
     from(publicKey: unknown): unknown;
@@ -70,6 +74,8 @@ const casperSdk = CasperSdk as unknown as {
     fromHex(publicKeyHex: string): unknown;
   };
 };
+
+const ACCOUNT_KEY_ARGS = new Set(["user", "agent"]);
 
 export function createSigningPayload<TArgs extends Record<string, unknown>>(
   request: DeployRequest<TArgs>,
@@ -97,6 +103,14 @@ function normalizeContractHash(contractHash: string): string {
 }
 
 function encodeRuntimeArg(name: string, value: unknown): unknown {
+  if (
+    typeof value === "string" &&
+    ACCOUNT_KEY_ARGS.has(name) &&
+    value.startsWith("account-hash-")
+  ) {
+    return casperSdk.CLValue.newCLKey(casperSdk.Key.newKey(value));
+  }
+
   if (typeof value === "bigint") {
     return name.endsWith("_block")
       ? casperSdk.CLValue.newCLUint64(value.toString())
@@ -153,6 +167,7 @@ export function prepareStageIntentDeploy(
     entrypoint: "stage_intent",
     paymentMotes: 2_500_000_000n,
     args: {
+      intent_id: intent.id,
       user: intent.user,
       agent: intent.agent,
       target: intent.target,
@@ -174,7 +189,7 @@ export function prepareRegisterAgentDeploy(
     entrypoint: "register_agent",
     paymentMotes: 2_500_000_000n,
     args: {
-      account_hash: agent.accountHash,
+      agent: agent.accountHash,
       public_key: agent.publicKey,
       name: agent.name,
       metadata_uri: agent.metadataUri,
@@ -238,6 +253,7 @@ export function prepareMandateDeploy(
     entrypoint: "create_mandate",
     paymentMotes: 3_000_000_000n,
     args: {
+      mandate_id: mandate.id,
       user: mandate.user,
       agent: mandate.agent,
       scope: mandate.scope,
@@ -272,6 +288,7 @@ export function prepareExecutePaymentDeploy(
     amount: bigint;
     target: string;
     resourceHash: string;
+    currentBlock?: bigint;
   },
 ): PreparedDeploy<Record<string, unknown>> {
   return prepareDeploy({
@@ -284,6 +301,7 @@ export function prepareExecutePaymentDeploy(
       amount: input.amount,
       target: input.target,
       resource_hash: input.resourceHash,
+      current_block: input.currentBlock ?? 1n,
     },
   });
 }

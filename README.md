@@ -15,14 +15,14 @@ This repository is a connected hackathon prototype. The local product loop is wi
 
 User-side CSPR.click submission is wired for vault deposit, vault withdraw, intent approval, and mandate revocation. Those flows build Casper contract-call transactions through `packages/casper`, send them through the connected wallet, verify the returned deploy or transaction hash against Casper Testnet RPC, and only then index the state change in the API.
 
-The API now records verified deploy events in PostgreSQL for vault, approval, mandate, execution, and receipt operations. Remaining production gap: `contracts/agent-mandates` is still a tested Rust contract-domain implementation, not a compiled deployed Odra contract package. The final authority still needs the contract crate converted to deployable Odra/Casper Wasm and deployed to Testnet.
+The API records verified deploy events in PostgreSQL for vault, approval, mandate, execution, and receipt operations. `contracts/agent-mandates` is now a deployable Odra contract package with optimized Casper Wasm and generated Casper schema artifacts. Remaining production gap: deploy the package to Casper Testnet and replace hash-level RPC confirmation with decoded contract-event indexing from the deployed package.
 
 ## Apps and Packages
 
 - `apps/web`: mobile-first PWA control center built with TanStack Start, TanStack Router, TanStack Query, Tailwind CSS, and shadcn-style components.
 - `apps/api`: Fastify API for wallet challenges, indexed reads, and x402 RWA payment verification.
 - `apps/agent`: MCP server exposing ProxyKey tools for AI agents.
-- `contracts/agent-mandates`: Rust contract-domain implementation for AgentRegistry, IntentInbox, MandateVault, and ReceiptLedger behavior.
+- `contracts/agent-mandates`: Odra/Rust Casper contract for agent registry, intent inbox, mandate vault, and receipt ledger behavior.
 - `packages/shared`: shared Zod schemas and TypeScript types.
 - `packages/casper`: Casper Testnet transaction helpers for CSPR.click and agent deploy payloads.
 - `packages/ui`: shared UI package boundary for future extracted components.
@@ -52,6 +52,8 @@ pnpm contracts:test
 pnpm --filter @proxykey/web dev
 pnpm --filter @proxykey/api dev
 pnpm --filter @proxykey/agent dev
+pnpm contracts:build
+pnpm contracts:schema
 ```
 
 ## Local Stack
@@ -107,12 +109,12 @@ pnpm contracts:test
 ```
 
 The current command-verified path covers shared schema validation, CSPR.click-ready transaction payload construction, Fastify route validation including deploy-hash gates, Casper deploy-event indexing code, MCP tool validation, production builds, and Rust contract-domain tests for nonce replay rejection, mandate caps, target/resource enforcement, revocation, and execution.
+The contract checks require nightly Rust because Odra 2.8.2 uses nightly macro features. The contract package pins `rust-toolchain` to `nightly`; `pnpm contracts:test`, `pnpm contracts:build`, and `pnpm contracts:schema` use that path.
 
 ## Next On-Chain Work
 
 To make ProxyKey fully Casper-authoritative:
 
-1. Convert the Rust contract-domain implementation into deployable Odra contracts.
-2. Deploy the contract package to Casper Testnet and set `PROXYKEY_CONTRACT_HASH` plus `VITE_PROXYKEY_CONTRACT_HASH`.
-3. Replace hash-level RPC verification with contract-event decoding once the deployed package emits structured events.
-4. Gate API mutation routes so only verified agent/user signatures can index pending off-chain state.
+1. Deploy `contracts/agent-mandates/wasm/AgentMandates.wasm` to Casper Testnet and set `PROXYKEY_CONTRACT_HASH` plus `VITE_PROXYKEY_CONTRACT_HASH`.
+2. Decode emitted contract events or query contract dictionaries from the deployed package instead of relying on hash-level confirmation only.
+3. Gate API mutation routes so only verified agent/user signatures can index pending off-chain state.
