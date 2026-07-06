@@ -16,6 +16,8 @@ export const DEFAULT_TESTNET_CONFIG: CasperNetworkConfig = {
   chainName: "casper-test",
 };
 
+export const VAULT_DEPOSIT_SESSION_PAYMENT_MOTES = 6_000_000_000;
+
 export type ContractEntrypoint =
   | "register_agent"
   | "stage_intent"
@@ -207,7 +209,7 @@ export function buildVaultDepositSessionTransaction(
     }),
   );
   transaction.chainName(network.chainName);
-  transaction.payment(3_000_000_000);
+  transaction.payment(VAULT_DEPOSIT_SESSION_PAYMENT_MOTES);
 
   const built = transaction.build();
   return {
