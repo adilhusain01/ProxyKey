@@ -30,6 +30,18 @@ pnpm --filter @proxykey/web test
 - CSPR.click sends the transaction from the connected wallet.
 - The API index is updated only after the wallet returns a deploy or transaction hash and the API verifies the finalized entrypoint/runtime args.
 
+## Demo Operator Flow
+
+1. Start the API and web app.
+2. Connect a funded Casper Testnet wallet through CSPR.click.
+3. Open `Vault`, enter the amount in CSPR, and sign `Deposit`.
+4. Use the MCP agent or `pnpm --filter @proxykey/agent testnet:lifecycle -- --skip-deposit --key ./casper_temp_private_key.pem` to register the agent and stage an intent.
+5. Open `Inbox`, inspect the pending agent request, and approve a scoped mandate through CSPR.click.
+6. Let the agent execute the authorized payment and verify the x402 report.
+7. Open `Mandates` and `Receipts` to show cap usage, status, and deploy hashes.
+
+The UI should show empty states for accounts with no indexed records. It should not show seeded fixture data during the demo.
+
 ## CSPR.click
 
 Local development uses the official `csprclick-template` app id. Set `VITE_CSPRCLICK_APP_ID` for a registered CSPR.build app id before deploying outside localhost.

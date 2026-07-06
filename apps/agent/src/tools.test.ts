@@ -45,6 +45,7 @@ describe("agent tools", () => {
       intentId: "intent-rwa-001",
       mandateId: "mandate-rwa-001",
       deployHash: hash,
+      recordDeployHash: hash,
       amount: 2500000000n,
       target: "rwa-risk-api",
       resourceHash: hash,

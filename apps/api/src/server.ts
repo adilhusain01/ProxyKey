@@ -930,7 +930,7 @@ export function buildServer() {
   app.post("/receipts", async (request, reply) => {
     const input = indexedReceiptInputSchema.parse(request.body);
     const deployEvent = await buildDeployEvent({
-      deployHash: input.deployHash,
+      deployHash: input.recordDeployHash,
       operation: "receipt.record",
       account: input.user,
       intentId: input.intentId,
@@ -947,8 +947,7 @@ export function buildServer() {
       },
     });
     const db = createDb();
-    const receipt = {
-      id: id("receipt", input),
+    const receiptIdentity = {
       intentId: input.intentId,
       mandateId: input.mandateId,
       deployHash: input.deployHash,
@@ -956,10 +955,24 @@ export function buildServer() {
       target: input.target,
       resourceHash: input.resourceHash,
       resultHash: input.resultHash,
+    };
+    const receipt = {
+      id: id("receipt", receiptIdentity),
+      ...receiptIdentity,
       createdAt: new Date(),
     };
     const [created] = await db.transaction(async (tx) => {
-      const [createdReceipt] = await tx.insert(receipts).values(receipt).returning();
+      const [createdReceipt] = await tx
+        .insert(receipts)
+        .values(receipt)
+        .onConflictDoUpdate({
+          target: receipts.id,
+          set: {
+            deployHash: receipt.deployHash,
+            resultHash: receipt.resultHash,
+          },
+        })
+        .returning();
       await tx
         .insert(deployEvents)
         .values(deployEvent)

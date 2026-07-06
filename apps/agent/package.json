@@ -8,6 +8,7 @@
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
+    "testnet:lifecycle": "node scripts/testnet-lifecycle.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run src",
     "lint": "tsc -p tsconfig.json --noEmit"

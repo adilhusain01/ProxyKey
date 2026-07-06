@@ -160,6 +160,7 @@ export const receiptInputSchema = receiptSchema.omit({
 
 export const indexedReceiptInputSchema = receiptInputSchema.extend({
   user: accountHashSchema,
+  recordDeployHash: hashSchema,
 });
 
 export const approveIntentInputSchema = z.object({

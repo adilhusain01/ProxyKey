@@ -70,6 +70,138 @@ pnpm --filter @proxykey/agent dev
 
 The web app runs on `http://localhost:3000` by default. If that port is in use, Vite will offer the next available port.
 
+For MCP clients, build the agent server first and run the built stdio entrypoint. Do not point MCP clients at the `dev` watcher because stdio MCP servers must keep stdout reserved for JSON-RPC messages.
+
+```sh
+pnpm --filter @proxykey/agent build
+node apps/agent/dist/main.js
+```
+
+## Demo Quick Start
+
+Use this path when preparing or rehearsing the hackathon demo:
+
+```sh
+cp .env.example .env
+docker compose up -d postgres
+pnpm install
+pnpm contracts:session:build
+pnpm --filter @proxykey/api db:migrate
+pnpm --filter @proxykey/api dev
+pnpm --filter @proxykey/web dev
+pnpm --filter @proxykey/agent build
+```
+
+Connect a Casper Testnet wallet in the PWA at `http://localhost:3000`, open `Vault`, and deposit enough CSPR for the mandate cap. Testnet contract calls use a 10 CSPR payment cap; unused payment is returned by Casper, but the wallet must have enough balance to cover the cap.
+
+For a command-level lifecycle test with a funded Testnet key:
+
+```sh
+pnpm --filter @proxykey/agent testnet:lifecycle -- \
+  --key ./casper_temp_private_key.pem \
+  --deposit-motes 50000000 \
+  --payment-motes 20000000
+```
+
+That command submits real Casper Testnet transactions and verifies the indexed API state. It performs:
+
+1. Vault deposit through the session Wasm.
+2. Agent registration on the ProxyKey package.
+3. Intent staging for a paid RWA risk report.
+4. Mandate creation for the staged intent.
+5. Authorized payment execution to the RWA settlement account.
+6. Receipt recording on-chain and in the API index.
+7. x402 RWA report payment verification.
+8. Account-scoped reads for vault, intents, mandates, receipts, and deploy events.
+
+The script reads `.env`, `PROXYKEY_CONTRACT_HASH`, `CASPER_NODE_RPC_URL`, `PROXYKEY_API_BASE_URL`, `RWA_SERVICE_ACCOUNT`, and the private key path passed through `--key`. Private keys are ignored by git.
+
+## MCP Agent Connection
+
+ProxyKey exposes a local stdio MCP server from `apps/agent`. Use it with any MCP client that supports local stdio servers. Example config:
+
+```json
+{
+  "mcpServers": {
+    "proxykey": {
+      "command": "node",
+      "args": [
+        "/Users/adilhusain/Downloads/untitled folder/apps/agent/dist/main.js"
+      ],
+      "env": {
+        "PROXYKEY_API_BASE_URL": "http://localhost:4000",
+        "PROXYKEY_CONTRACT_HASH": "hash-ea3286e01d2a2631293212506ea22e18eea25b1336e1b5cf06d493bb55a1f3b7"
+      }
+    }
+  }
+}
+```
+
+The MCP server does not receive the user's private key. Agent tools return prepared Casper deploy data or index finalized hashes after a wallet/agent runtime submits transactions. See `apps/agent/README.md` for exact tool payloads.
+
+## Demo Narrative
+
+Use this flow for the video and live walkthrough:
+
+1. Open with the problem: AI agents can discover opportunities and call APIs, but giving them a user private key is unacceptable. ProxyKey replaces private-key sharing with user-owned Casper mandates.
+2. Show the PWA inbox and vault: the user controls a Casper Testnet vault, sees pending agent intents, and approves/revokes scoped authority.
+3. Show the agent side: an MCP-connected AI agent registers identity, requests paid RWA risk data, and stages an intent without holding the user's key.
+4. Show the user approval: the wallet signs a Casper mandate with cap, target, resource hash, and expiry.
+5. Show execution: the agent executes with its own key; the contract enforces agent identity, target, resource hash, cap, nonce, expiry, and vault balance.
+6. Show the x402 moment: the RWA API returns HTTP 402 payment requirements, then returns the report only after the Casper payment proof verifies.
+7. Close on auditability: the UI shows Testnet deploy hashes and receipts, proving the agent acted under scoped user permission.
+
+Recommended one-line pitch:
+
+> ProxyKey is a Casper-native mandate layer that lets AI agents transact for users without ever receiving user private keys.
+
+## Submission Package
+
+The Casper Agentic Buildathon Qualification Round requires a working prototype on Casper Testnet with a transaction-producing on-chain component, an open-source repository with usage documentation, and a public demo video. The extended submission deadline shown in the hackathon details is July 7, 2026 at 23:59. Public pages: [DoraHacks detail](https://dorahacks.io/hackathon/casper-agentic-buildathon/detail), [DoraHacks tracks](https://dorahacks.io/hackathon/casper-agentic-buildathon/tracks), and [Casper AI Toolkit](https://www.casper.network/ai).
+
+ProxyKey should be submitted under the unified Casper Innovation Track with the RWA/x402 narrative first and DeFi as the next adjacent use case.
+
+Use this project description as the submission base:
+
+```text
+ProxyKey is a Casper-native authorization layer for AI agents. Instead of giving an agent a private key, a user funds a Casper vault and signs scoped mandates that define exactly what an agent may do: target, resource hash, spend cap, expiry, and revocation state.
+
+The demo focuses on RWA x402 payments. An MCP-connected AI agent requests paid RWA risk intelligence, stages an intent on Casper Testnet, and waits for the user to approve a mandate in the ProxyKey PWA. After approval, the agent executes a Casper payment from the user-funded vault to the RWA service. The contract enforces mandate scope and records receipts, while the API indexes only finalized Casper transactions.
+
+ProxyKey matters because AI agents need payment authority, but users and institutions cannot hand over signing keys. Casper's account model, Rust/Wasm contracts, upgradability, CSPR.click wallet flow, and Testnet transaction finality make it a strong base for auditable agent permissions.
+```
+
+Demo video checklist:
+
+- Show the wallet connection on Casper Testnet.
+- Show vault deposit producing a Casper Testnet transaction.
+- Show an MCP agent staging an intent.
+- Show the user approving a scoped mandate through CSPR.click.
+- Show the agent executing an authorized payment.
+- Show the x402 RWA report unlock.
+- Show receipt/deploy hashes in the UI and on CSPR.live.
+
+Judging alignment:
+
+- Technical execution: monorepo with PWA, Fastify indexer, MCP server, shared schemas, Casper helpers, Odra contract, PostgreSQL, and live Testnet verification.
+- Innovation and originality: user-owned mandates replace private-key sharing for AI agents.
+- Use of AI/agentic systems: MCP tools let an AI agent register, request authority, stage intents, check mandates, execute authorized payments, and explain approvals.
+- Real-world applicability: RWA risk-data payments demonstrate how treasury, DeFi, and institutional workflows can let agents act without custodying user keys.
+- UX and design: mobile-first approval inbox, vault, mandate, agent, receipt, and report surfaces.
+- Working smart contracts: deployed Casper Testnet package with vault, mandate, execution, and receipt entrypoints.
+- Long-term launch plan: evolve from Testnet prototype into reusable Casper agent authorization infrastructure for RWA APIs, treasury agents, and DeFi automation.
+- Long-term impact: positions Casper as a trust and permission layer for the agent economy, where agents can transact under auditable user-owned limits.
+
+Repository submission checklist:
+
+- GitHub URL.
+- Demo video URL.
+- Testnet package hash: `hash-ea3286e01d2a2631293212506ea22e18eea25b1336e1b5cf06d493bb55a1f3b7`.
+- At least one successful vault deposit, mandate creation, payment execution, and receipt deploy hash.
+- README sections for setup, MCP, demo, and verification.
+- Short project description using the RWA x402 narrative above.
+- Project socials or launch-plan links if available, because final judging includes long-term launch plans.
+
 ## Environment
 
 - `DATABASE_URL`: PostgreSQL connection used by the Fastify indexer API.
