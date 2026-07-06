@@ -10,12 +10,6 @@ import {
   executePaymentInputSchema,
   mandateInputSchema,
   stagedIntentInputSchema,
-  type AgentProfile,
-  type ExecutePaymentInput,
-  type IndexedAgentProfile,
-  type IndexedStagedIntentInput,
-  type MandateInput,
-  type StagedIntentInput,
 } from "@proxykey/shared";
 import {
   prepareExecutePaymentDeploy,
@@ -33,6 +27,98 @@ const CONTRACT_HASH =
   process.env.PROXYKEY_CONTRACT_HASH ??
   "hash-0000000000000000000000000000000000000000000000000000000000000000";
 const API_BASE_URL = process.env.PROXYKEY_API_BASE_URL || undefined;
+
+const mcpAccountHashSchema = z
+  .string()
+  .min(16)
+  .describe("Casper account hash or public key hex");
+const mcpHashSchema = z
+  .string()
+  .regex(/^(0x)?[a-fA-F0-9]{32,128}$/)
+  .describe("Hex-encoded content, deploy, or result hash");
+const mcpPositiveAmountSchema = z
+  .string()
+  .regex(/^[1-9]\d*$/)
+  .describe("Positive integer encoded as a decimal string in motes");
+const mcpNonZeroBlockSchema = z
+  .string()
+  .regex(/^[1-9]\d*$/)
+  .describe("Positive Casper block height encoded as a decimal string");
+
+const mcpAgentProfileSchema = z.object({
+  accountHash: mcpAccountHashSchema,
+  publicKey: z.string().min(32),
+  name: z.string().min(2).max(80),
+  metadataUri: z.string().url(),
+  capabilities: z
+    .array(
+      z.enum([
+        "rwa-risk-data",
+        "x402-payment",
+        "defi-rebalance",
+        "receipt-ledger",
+      ]),
+    )
+    .min(1),
+  capabilitiesHash: mcpHashSchema,
+  status: z.enum(["active", "paused", "revoked"]),
+});
+
+const mcpIndexedAgentProfileSchema = mcpAgentProfileSchema.extend({
+  deployHash: mcpHashSchema,
+});
+
+const mcpStagedIntentInputSchema = z.object({
+  user: mcpAccountHashSchema,
+  agent: mcpAccountHashSchema,
+  target: z.string().min(3).max(120),
+  action: z.string().min(3).max(120),
+  reason: z.string().min(8).max(500),
+  amount: mcpPositiveAmountSchema,
+  resourceHash: mcpHashSchema,
+  payloadHash: mcpHashSchema,
+  nonce: z.string().min(8),
+});
+
+const mcpIndexedStagedIntentInputSchema = mcpStagedIntentInputSchema.extend({
+  deployHash: mcpHashSchema,
+});
+
+const mcpMandateInputSchema = z.object({
+  user: mcpAccountHashSchema,
+  agent: mcpAccountHashSchema,
+  scope: z.enum(["single-intent", "delegated"]),
+  cap: mcpPositiveAmountSchema,
+  target: z.string().min(3).max(120),
+  resourcePatternHash: mcpHashSchema,
+  expiryBlock: mcpNonZeroBlockSchema,
+});
+
+const mcpExecutePaymentInputSchema = z.object({
+  user: mcpAccountHashSchema,
+  mandateId: z.string().min(8),
+  agent: mcpAccountHashSchema,
+  settlementAccount: mcpAccountHashSchema,
+  intentId: z.string().min(8).optional(),
+  amount: mcpPositiveAmountSchema,
+  target: z.string().min(3).max(120),
+  resourceHash: mcpHashSchema,
+  deployHash: mcpHashSchema,
+  resultHash: mcpHashSchema,
+  currentBlock: mcpNonZeroBlockSchema.optional(),
+});
+
+const mcpReceiptInputSchema = z.object({
+  user: mcpAccountHashSchema,
+  intentId: z.string().min(8),
+  mandateId: z.string().min(8),
+  deployHash: mcpHashSchema,
+  recordDeployHash: mcpHashSchema,
+  amount: mcpPositiveAmountSchema,
+  target: z.string().min(3).max(120),
+  resourceHash: mcpHashSchema,
+  resultHash: mcpHashSchema,
+});
 
 function id(prefix: string, payload: unknown) {
   return `${prefix}-${crypto
@@ -75,7 +161,7 @@ async function getApi(path: string) {
   return payload;
 }
 
-export async function registerAgent(input: AgentProfile) {
+export async function registerAgent(input: unknown) {
   const agent = agentProfileSchema.parse(input);
   return {
     status: "deploy-ready",
@@ -85,7 +171,7 @@ export async function registerAgent(input: AgentProfile) {
   };
 }
 
-export async function stageIntent(input: StagedIntentInput) {
+export async function stageIntent(input: unknown) {
   const staged = stagedIntentInputSchema.parse(input);
   const intent = {
     id: id("intent", staged),
@@ -101,7 +187,7 @@ export async function stageIntent(input: StagedIntentInput) {
   };
 }
 
-export async function indexRegisteredAgent(input: IndexedAgentProfile) {
+export async function indexRegisteredAgent(input: unknown) {
   const agent = indexedAgentProfileSchema.parse(input);
   const indexed = await postApi("/agents", agent);
 
@@ -112,7 +198,7 @@ export async function indexRegisteredAgent(input: IndexedAgentProfile) {
   };
 }
 
-export async function indexStagedIntent(input: IndexedStagedIntentInput) {
+export async function indexStagedIntent(input: unknown) {
   const intent = indexedStagedIntentInputSchema.parse(input);
   const indexed = await postApi(`/users/${intent.user}/intents`, intent);
 
@@ -123,7 +209,7 @@ export async function indexStagedIntent(input: IndexedStagedIntentInput) {
   };
 }
 
-export async function requestMandate(input: MandateInput) {
+export async function requestMandate(input: unknown) {
   const mandate = mandateInputSchema.parse(input);
   return {
     mandateRequestId: id("mandate-request", mandate),
@@ -153,7 +239,7 @@ export async function checkMandate(input: { user: string; mandateId: string }) {
 }
 
 export async function executeAuthorizedPayment(
-  input: ExecutePaymentInput & { user: string; mandateId: string },
+  input: unknown,
 ) {
   const execution = executePaymentInputSchema
     .extend({
@@ -230,24 +316,21 @@ export function explainPendingApproval(input: {
 }
 
 export const schemas = {
-  registerAgent: agentProfileSchema,
-  stageIntent: stagedIntentInputSchema,
-  indexRegisteredAgent: indexedAgentProfileSchema,
-  indexStagedIntent: indexedStagedIntentInputSchema,
-  requestMandate: mandateInputSchema,
+  registerAgent: mcpAgentProfileSchema,
+  stageIntent: mcpStagedIntentInputSchema,
+  indexRegisteredAgent: mcpIndexedAgentProfileSchema,
+  indexStagedIntent: mcpIndexedStagedIntentInputSchema,
+  requestMandate: mcpMandateInputSchema,
   checkMandate: z.object({
     user: z.string().min(16),
     mandateId: z.string().min(8),
   }),
-  executeAuthorizedPayment: executePaymentInputSchema.extend({
-    user: z.string().min(16),
-    mandateId: z.string().min(8),
-  }),
+  executeAuthorizedPayment: mcpExecutePaymentInputSchema,
   fetchRwaReport: z.object({
     asset: z.string().min(2),
     apiBaseUrl: z.string().url(),
   }),
-  recordReceipt: indexedReceiptInputSchema,
+  recordReceipt: mcpReceiptInputSchema,
   explainPendingApproval: z.object({
     agentName: z.string().min(2),
     target: z.string().min(3),
