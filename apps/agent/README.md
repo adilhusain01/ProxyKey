@@ -44,7 +44,26 @@ Build before connecting:
 pnpm --filter @proxykey/agent build
 ```
 
-Add this server to the MCP client config:
+For VS Code MCP, add this server to `.vscode/mcp.json` or the user MCP config. VS Code uses the `servers` key:
+
+```json
+{
+  "servers": {
+    "proxykey": {
+      "command": "node",
+      "args": [
+        "/Users/adilhusain/Downloads/untitled folder/apps/agent/dist/main.js"
+      ],
+      "env": {
+        "PROXYKEY_API_BASE_URL": "http://localhost:4000",
+        "PROXYKEY_CONTRACT_HASH": "hash-ea3286e01d2a2631293212506ea22e18eea25b1336e1b5cf06d493bb55a1f3b7"
+      }
+    }
+  }
+}
+```
+
+For Claude Desktop, Cursor, and other clients that use the common MCP config shape, add:
 
 ```json
 {

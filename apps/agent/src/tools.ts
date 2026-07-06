@@ -24,7 +24,10 @@ import {
   prepareStageIntentDeploy,
 } from "@proxykey/casper";
 
-config({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
+config({
+  path: fileURLToPath(new URL("../../../.env", import.meta.url)),
+  quiet: true,
+});
 
 const CONTRACT_HASH =
   process.env.PROXYKEY_CONTRACT_HASH ??

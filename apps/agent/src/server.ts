@@ -11,7 +11,7 @@ import {
   requestMandate,
   schemas,
   stageIntent,
-} from "./tools";
+} from "./tools.js";
 
 function asText(value: unknown) {
   return {

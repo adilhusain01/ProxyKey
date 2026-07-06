@@ -118,7 +118,26 @@ The script reads `.env`, `PROXYKEY_CONTRACT_HASH`, `CASPER_NODE_RPC_URL`, `PROXY
 
 ## MCP Agent Connection
 
-ProxyKey exposes a local stdio MCP server from `apps/agent`. Use it with any MCP client that supports local stdio servers. Example config:
+ProxyKey exposes a local stdio MCP server from `apps/agent`. Use it with any MCP client that supports local stdio servers. VS Code uses a `servers` key:
+
+```json
+{
+  "servers": {
+    "proxykey": {
+      "command": "node",
+      "args": [
+        "/Users/adilhusain/Downloads/untitled folder/apps/agent/dist/main.js"
+      ],
+      "env": {
+        "PROXYKEY_API_BASE_URL": "http://localhost:4000",
+        "PROXYKEY_CONTRACT_HASH": "hash-ea3286e01d2a2631293212506ea22e18eea25b1336e1b5cf06d493bb55a1f3b7"
+      }
+    }
+  }
+}
+```
+
+Claude Desktop, Cursor, and other clients commonly use `mcpServers`:
 
 ```json
 {
