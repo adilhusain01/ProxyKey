@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildVaultDepositSessionTransaction,
+  CONTRACT_CALL_PAYMENT_MOTES,
   prepareApproveIntentDeploy,
   VAULT_DEPOSIT_SESSION_PAYMENT_MOTES,
 } from "./index";
@@ -11,7 +12,11 @@ const user = `account-hash-${"3".repeat(64)}`;
 
 describe("casper deploy helpers", () => {
   it("keeps vault deposit session payment above observed Testnet gas", () => {
-    expect(VAULT_DEPOSIT_SESSION_PAYMENT_MOTES).toBe(6_000_000_000);
+    expect(VAULT_DEPOSIT_SESSION_PAYMENT_MOTES).toBe(10_000_000_000);
+  });
+
+  it("keeps contract call payment above observed Testnet gas", () => {
+    expect(CONTRACT_CALL_PAYMENT_MOTES).toBe(10_000_000_000n);
   });
 
   it("builds a CSPR.click-ready session transaction for vault deposits", () => {

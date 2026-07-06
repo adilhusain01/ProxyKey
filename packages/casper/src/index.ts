@@ -16,7 +16,8 @@ export const DEFAULT_TESTNET_CONFIG: CasperNetworkConfig = {
   chainName: "casper-test",
 };
 
-export const VAULT_DEPOSIT_SESSION_PAYMENT_MOTES = 6_000_000_000;
+export const CONTRACT_CALL_PAYMENT_MOTES = 10_000_000_000n;
+export const VAULT_DEPOSIT_SESSION_PAYMENT_MOTES = 10_000_000_000;
 
 export type ContractEntrypoint =
   | "register_agent"
@@ -233,7 +234,7 @@ export function prepareStageIntentDeploy(
   return prepareDeploy({
     contractHash,
     entrypoint: "stage_intent",
-    paymentMotes: 2_500_000_000n,
+    paymentMotes: CONTRACT_CALL_PAYMENT_MOTES,
     args: {
       intent_id: intent.id,
       user: intent.user,
@@ -255,7 +256,7 @@ export function prepareRegisterAgentDeploy(
   return prepareDeploy({
     contractHash,
     entrypoint: "register_agent",
-    paymentMotes: 2_500_000_000n,
+    paymentMotes: CONTRACT_CALL_PAYMENT_MOTES,
     args: {
       agent: agent.accountHash,
       public_key: agent.publicKey,
@@ -274,7 +275,7 @@ export function prepareVaultDepositDeploy(
   return prepareDeploy({
     contractHash,
     entrypoint: "deposit",
-    paymentMotes: 2_500_000_000n,
+    paymentMotes: CONTRACT_CALL_PAYMENT_MOTES,
     args: {
       user: input.user,
       amount: input.amount,
@@ -289,7 +290,7 @@ export function prepareVaultWithdrawDeploy(
   return prepareDeploy({
     contractHash,
     entrypoint: "withdraw",
-    paymentMotes: 2_500_000_000n,
+    paymentMotes: CONTRACT_CALL_PAYMENT_MOTES,
     args: {
       user: input.user,
       amount: input.amount,
@@ -304,7 +305,7 @@ export function prepareApproveIntentDeploy(
   return prepareDeploy({
     contractHash,
     entrypoint: "approve_intent",
-    paymentMotes: 2_500_000_000n,
+    paymentMotes: CONTRACT_CALL_PAYMENT_MOTES,
     args: {
       intent_id: input.intentId,
       user: input.user,
@@ -319,7 +320,7 @@ export function prepareRejectIntentDeploy(
   return prepareDeploy({
     contractHash,
     entrypoint: "reject_intent",
-    paymentMotes: 2_500_000_000n,
+    paymentMotes: CONTRACT_CALL_PAYMENT_MOTES,
     args: {
       intent_id: input.intentId,
       user: input.user,
@@ -334,7 +335,7 @@ export function prepareMandateDeploy(
   return prepareDeploy({
     contractHash,
     entrypoint: "create_mandate",
-    paymentMotes: 3_000_000_000n,
+    paymentMotes: CONTRACT_CALL_PAYMENT_MOTES,
     args: {
       mandate_id: mandate.id,
       user: mandate.user,
@@ -355,7 +356,7 @@ export function prepareRevokeMandateDeploy(
   return prepareDeploy({
     contractHash,
     entrypoint: "revoke_mandate",
-    paymentMotes: 2_500_000_000n,
+    paymentMotes: CONTRACT_CALL_PAYMENT_MOTES,
     args: {
       mandate_id: input.mandateId,
       user: input.user,
@@ -378,7 +379,7 @@ export function prepareExecutePaymentDeploy(
   return prepareDeploy({
     contractHash,
     entrypoint: "execute_payment",
-    paymentMotes: 3_000_000_000n,
+    paymentMotes: CONTRACT_CALL_PAYMENT_MOTES,
     args: {
       mandate_id: input.mandateId,
       agent: input.agent,
@@ -398,7 +399,7 @@ export function prepareRecordReceiptDeploy(
   return prepareDeploy({
     contractHash,
     entrypoint: "record_receipt",
-    paymentMotes: 2_500_000_000n,
+    paymentMotes: CONTRACT_CALL_PAYMENT_MOTES,
     args: {
       receipt_id: receipt.id,
       intent_id: receipt.intentId,
