@@ -216,6 +216,14 @@ export function buildVaultDepositSessionTransaction(
   };
 }
 
+export function accountHashFromPublicKey(publicKeyHex: string): string {
+  const publicKey = casperSdk.PublicKey.fromHex(publicKeyHex) as {
+    accountHash(): { toHex(): string; toPrefixedString?: () => string };
+  };
+  const accountHash = publicKey.accountHash();
+  return accountHash.toPrefixedString?.() ?? `account-hash-${accountHash.toHex()}`;
+}
+
 export function prepareStageIntentDeploy(
   contractHash: string,
   intent: Intent,
