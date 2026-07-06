@@ -8,7 +8,7 @@ use casper_contract::unwrap_or_revert::UnwrapOrRevert;
 use casper_types::contracts::ContractPackageHash;
 use casper_types::{runtime_args, Key, RuntimeArgs, U512};
 
-const CARGO_PURSE_ARG: &str = "__cargo_purse";
+const CARGO_PURSE_ARG: &str = "cargo_purse";
 
 #[no_mangle]
 pub extern "C" fn call() {
