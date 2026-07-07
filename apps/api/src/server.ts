@@ -853,8 +853,7 @@ export function buildServer() {
             );
         }
 
-        const receiptInput = {
-          user: mandate.user,
+        const receiptIdentity = {
           intentId: input.intentId ?? `manual-${mandate.id}`,
           mandateId: mandate.id,
           deployHash: input.deployHash,
@@ -862,17 +861,10 @@ export function buildServer() {
           target: input.target,
           resourceHash: input.resourceHash,
           resultHash: input.resultHash,
-          settlementAccount: input.settlementAccount,
         };
         const receipt = {
-          id: id("receipt", receiptInput),
-          intentId: receiptInput.intentId,
-          mandateId: receiptInput.mandateId,
-          deployHash: receiptInput.deployHash,
-          amount: receiptInput.amount,
-          target: receiptInput.target,
-          resourceHash: receiptInput.resourceHash,
-          resultHash: receiptInput.resultHash,
+          id: id("receipt", receiptIdentity),
+          ...receiptIdentity,
           createdAt: new Date(),
         };
         const [createdReceipt] = await tx
