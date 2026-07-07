@@ -116,6 +116,8 @@ That command submits real Casper Testnet transactions and verifies the indexed A
 
 The script reads `.env`, `PROXYKEY_CONTRACT_HASH`, `CASPER_NODE_RPC_URL`, `PROXYKEY_API_BASE_URL`, `RWA_SERVICE_ACCOUNT`, and the private key path passed through `--key`. Private keys are ignored by git.
 
+For the exact recording order, narration, screen sequence, and known-good Testnet proof, use [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
+
 ## MCP Agent Connection
 
 ProxyKey exposes a local stdio MCP server from `apps/agent`. Use it with any MCP client that supports local stdio servers. VS Code uses a `servers` key:
