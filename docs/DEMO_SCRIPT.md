@@ -80,8 +80,6 @@ You are RWA Sentinel, an AI agent connected to ProxyKey through MCP.
 
 Use the ProxyKey MCP tools to demonstrate an agent payment request for a tokenized-tbill RWA risk report.
 
-Do not ask for or handle the user's private key.
-
 Use this user and agent account for the demo:
 account-hash-e477f3fc9ee23eb4a63afe976e2cd5865922432728fcb00b5ac42c03855c00a7
 
@@ -92,7 +90,7 @@ Then call stage_intent with a fresh nonce and explain_pending_approval for the u
 Then call request_mandate to show the mandate shape.
 After I provide finalized deploy hashes, call index_staged_intent, check_mandate, execute_authorized_payment, and record_receipt as appropriate.
 
-Explain every step in user-readable language and emphasize that the agent never receives the user's private key.
+Explain every step in user-readable language.
 ```
 
 ## Demo Flow

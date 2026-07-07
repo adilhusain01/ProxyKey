@@ -13,6 +13,7 @@ export function CsprClickRuntime({ children }: { children: ReactNode }) {
     let mounted = true
 
     async function loadRuntime() {
+      console.log("[CsprClickRuntime] Loading CSPR.click runtime modules…")
       const [ui, types, styled] = await Promise.all([
         import("@make-software/csprclick-ui"),
         import("@make-software/csprclick-core-types"),
@@ -21,6 +22,7 @@ export function CsprClickRuntime({ children }: { children: ReactNode }) {
 
       if (!mounted) return
 
+      console.log("[CsprClickRuntime] Modules loaded. Setting up ClickProvider.")
       setRuntime({
         ClickProvider: ui.ClickProvider,
         ClickUI: ui.ClickUI,
@@ -38,6 +40,7 @@ export function CsprClickRuntime({ children }: { children: ReactNode }) {
   }, [])
 
   if (!runtime) {
+    console.log("[CsprClickRuntime] Runtime not ready yet, rendering children without provider.")
     return children
   }
 
@@ -51,11 +54,13 @@ export function CsprClickRuntime({ children }: { children: ReactNode }) {
     ...(walletConnectProjectId ? ["walletconnect"] : []),
   ]
 
+  const appId =
+    (import.meta.env.VITE_CSPRCLICK_APP_ID as string | undefined) ??
+    "csprclick-template"
+
   const options = {
     appName: "ProxyKey",
-    appId:
-      (import.meta.env.VITE_CSPRCLICK_APP_ID as string | undefined) ??
-      "csprclick-template",
+    appId,
     contentMode: runtime.contentMode,
     providers,
     chainName: "casper-test",
@@ -64,13 +69,20 @@ export function CsprClickRuntime({ children }: { children: ReactNode }) {
       : {}),
   }
 
+  console.log("[CsprClickRuntime] Rendering ClickProvider with options:", options)
+
+  // IMPORTANT: rootAppElement must be a child of <body>, NOT <body> itself.
+  // Setting it to "body" causes the browser to block aria-hidden on the body
+  // element, which breaks the CSPR.click modal entirely (see console warning).
+  const rootAppElement = "#app-root"
+
   return createElement(
     runtime.ThemeProvider,
     { theme: runtime.theme },
     createElement(
       runtime.ClickProvider,
       { options },
-      createElement(runtime.ClickUI, { rootAppElement: "body" }) as ReactNode,
+      createElement(runtime.ClickUI, { rootAppElement }) as ReactNode,
       children,
     ),
   )
