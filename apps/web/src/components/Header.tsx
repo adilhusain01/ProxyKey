@@ -5,7 +5,7 @@ import { Button } from "#/components/ui/button"
 import WalletConnectButton from "./WalletConnectButton"
 
 const navItems = [
-  { to: "/", label: "Inbox" },
+  { to: "/", label: "Home" },
   { to: "/mandates", label: "Mandates" },
   { to: "/vault", label: "Vault" },
   { to: "/agents", label: "Agents" },
@@ -14,32 +14,31 @@ const navItems = [
 
 export default function Header() {
   return (
-    <header className="sticky top-0 z-50 border-b border-border/80 bg-background/88 px-4 backdrop-blur-xl">
+    <header className="app-header px-4">
       <nav className="mx-auto flex min-h-16 w-full max-w-7xl items-center gap-3">
         <Link
           to="/"
           className="flex min-h-11 items-center gap-2 rounded-lg text-foreground no-underline"
         >
-          <span className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+          <span className="brand-mark">
             <KeyRound className="size-4" />
           </span>
           <span className="leading-tight">
-            <span className="block text-sm font-bold">ProxyKey</span>
+            <span className="block text-sm font-black">ProxyKey</span>
             <span className="hidden text-xs text-muted-foreground sm:block">
-              Casper agent mandates
+              Agent mandates on Casper
             </span>
           </span>
         </Link>
 
-        <div className="hidden items-center gap-1 lg:flex">
+        <div className="hidden items-center gap-1 xl:flex">
           {navItems.map((item) => (
             <Link
               key={item.to}
               to={item.to}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground no-underline transition hover:bg-muted hover:text-foreground"
+              className="app-nav-link"
               activeProps={{
-                className:
-                  "rounded-lg bg-muted px-3 py-2 text-sm font-semibold text-foreground no-underline",
+                className: "app-nav-link app-nav-link-active",
               }}
             >
               {item.label}
@@ -59,15 +58,14 @@ export default function Header() {
           </Button>
         </div>
       </nav>
-      <div className="mx-auto flex w-full max-w-7xl gap-1 overflow-x-auto pb-3 lg:hidden">
+      <div className="mx-auto flex w-full max-w-7xl gap-1 overflow-x-auto pb-3 xl:hidden">
         {navItems.map((item) => (
           <Link
             key={item.to}
             to={item.to}
-            className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground no-underline"
+            className="app-nav-link whitespace-nowrap"
             activeProps={{
-              className:
-                "whitespace-nowrap rounded-lg bg-muted px-3 py-2 text-sm font-semibold text-foreground no-underline",
+              className: "app-nav-link app-nav-link-active whitespace-nowrap",
             }}
           >
             {item.label}
